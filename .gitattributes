@@ -1,0 +1,5 @@
+* text=auto eol=lf
+*.docx -text
+*.jpg -text
+*.png -text
+"MCAF Guide.md" -text

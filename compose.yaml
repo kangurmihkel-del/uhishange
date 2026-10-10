@@ -1,0 +1,63 @@
+name: uhishange
+services:
+  db:
+    restart: unless-stopped
+    image: postgis/postgis:17-3.5
+    environment:
+      POSTGRES_USER: uhishange
+      POSTGRES_PASSWORD: uhishange
+      POSTGRES_DB: uhishange
+    ports:
+      - '127.0.0.1:54329:5432'
+    volumes:
+      - database:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U uhishange -d uhishange']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  init:
+    build: .
+    command: ['node', 'dist/server/server/bootstrap.js']
+    environment:
+      DATABASE_URL: postgres://uhishange:uhishange@db:5432/uhishange
+      TEST_PAYMENTS: 'true'
+    depends_on:
+      db:
+        condition: service_healthy
+  app:
+    restart: unless-stopped
+    build: .
+    environment:
+      DATABASE_URL: postgres://uhishange:uhishange@db:5432/uhishange
+      PORT: '3000'
+      HOST: '0.0.0.0'
+      TEST_PAYMENTS: 'true'
+    ports:
+      - '127.0.0.1:3000:3000'
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "fetch('http://127.0.0.1:3000/api/v1/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  worker:
+    restart: unless-stopped
+    build: .
+    command: ['node', 'dist/server/server/worker.js']
+    environment:
+      DATABASE_URL: postgres://uhishange:uhishange@db:5432/uhishange
+      TEST_PAYMENTS: 'true'
+    depends_on:
+      init:
+        condition: service_completed_successfully
+volumes:
+  database:

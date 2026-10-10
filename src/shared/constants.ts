@@ -1,0 +1,2 @@
+export const PLATFORM_FEE_BASIS_POINTS = 400;
+export const DEFAULT_RADIUS_M = 500;

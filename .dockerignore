@@ -1,0 +1,12 @@
+node_modules
+dist
+.git
+.env*
+*.docx
+*.jpg
+*.png
+coverage
+playwright-report
+test-results
+
+backups/

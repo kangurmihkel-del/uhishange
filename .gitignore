@@ -1,0 +1,15 @@
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+.env
+.env.*
+!.env.example
+*.log
+.tmp/
+
+backups/
+
+# Original event poster contains participant names; retain locally.
+/1000012998.jpg

@@ -1,0 +1,32 @@
+name: Verify
+on:
+  push:
+  pull_request:
+permissions:
+  contents: read
+jobs:
+  portal:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '24'
+          cache: npm
+      - run: npm ci
+      - run: docker compose up -d --wait db
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: npm run analyze
+      - run: npm test
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: verification-results
+          path: |
+            coverage/
+            playwright-report/
+            test-results/
+      - run: docker compose down
+        if: always()

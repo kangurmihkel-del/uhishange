@@ -1,0 +1,53 @@
+{
+  "name": "uhishange-pilot",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "dev": "tsx watch src/server/server.ts",
+    "dev:ui": "vite --host 127.0.0.1",
+    "build": "tsc -p tsconfig.server.json && vite build",
+    "start": "node dist/server/server/server.js",
+    "bootstrap": "tsx src/server/bootstrap.ts",
+    "worker": "tsx src/server/worker.ts",
+    "test": "npm run test:integration && npm run test:e2e",
+    "test:integration": "npm run test:setup && vitest run",
+    "test:e2e": "npm run test:setup && playwright test",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "analyze": "tsc --noEmit && eslint src tests && npm run format:check",
+    "test:setup": "node scripts/test-databases.mjs"
+  },
+  "dependencies": {
+    "cookie-parser": "^1.4.7",
+    "csv-parse": "^7.0.3",
+    "express": "^5.1.0",
+    "lucide-react": "^0.468.0",
+    "pg": "^8.16.3",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "zod": "^4.1.12"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "@playwright/test": "^1.56.0",
+    "@types/cookie-parser": "^1.4.9",
+    "@types/express": "^5.0.5",
+    "@types/node": "^24.10.0",
+    "@types/pg": "^8.15.5",
+    "@types/react": "^19.2.2",
+    "@types/react-dom": "^19.2.2",
+    "@vitejs/plugin-react": "^5.1.0",
+    "@vitest/coverage-v8": "^5.0.3",
+    "eslint": "^9.39.0",
+    "prettier": "^3.6.2",
+    "tsx": "^4.20.6",
+    "typescript": "^5.9.3",
+    "typescript-eslint": "^8.46.2",
+    "vite": "^7.1.12",
+    "vitest": "^5.0.3"
+  }
+}
