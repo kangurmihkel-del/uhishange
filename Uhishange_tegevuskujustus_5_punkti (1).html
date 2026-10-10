@@ -1,0 +1,894 @@
+<!doctype html>
+<html lang="et">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Ühishange – tegevuskujustus (5 punkti plaan)</title>
+<style>
+  :root{
+    --bg:#eef2f4; --paper:#ffffff; --ink:#183642; --muted:#6d7f86;
+    --grid:#cfd8dc; --lane:#274c5a; --stage:#7aa4a8; --objective:#c7d7cf;
+    --grey:#9aa5aa; --yellow:#f0c419; --green:#4caf50; --red:#d9534f;
+    --blue:#2f6b7a;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;font-family:Inter,Segoe UI,Arial,sans-serif;background:var(--bg);color:var(--ink)}
+  .app{max-width:1800px;margin:0 auto;padding:18px}
+  .toolbar{
+    display:flex;gap:10px;align-items:center;flex-wrap:wrap;background:var(--paper);
+    padding:12px 14px;border-radius:14px;box-shadow:0 2px 14px rgba(30,60,70,.08);margin-bottom:14px
+  }
+  .toolbar h1{font-size:18px;font-weight:700}
+  button,.file-label{
+    border:1px solid #ccd7da;background:white;color:var(--ink);border-radius:9px;
+    padding:9px 12px;font-weight:600;cursor:pointer
+  }
+  button:hover,.file-label:hover{background:#f2f6f7}
+  .primary{background:var(--blue);color:#fff;border-color:var(--blue)}
+  .primary:hover{background:#285c68}
+  input[type=file]{display:none}
+  .workspace{display:grid;grid-template-columns:minmax(0,1fr) 300px;gap:14px;align-items:start}
+  .canvas-card,.inspector,.legend-card{background:var(--paper);border-radius:16px;box-shadow:0 2px 14px rgba(30,60,70,.08)}
+  .canvas-card{padding:12px;overflow:auto}
+  .canvas-wrap{overflow:auto;width:100%}
+  #scene{
+    display:block;user-select:none;touch-action:none;transform-origin:top left;
+    width:1500px;height:auto;max-width:none;
+  }
+  .inspector{padding:16px;position:sticky;top:12px}
+  .inspector h2{font-size:16px;margin:0 0 12px}
+  .field{margin-bottom:12px}
+  .field label{display:block;font-size:12px;color:var(--muted);margin-bottom:5px;font-weight:700;text-transform:uppercase;letter-spacing:.04em}
+  .field input,.field textarea,.field select{
+    width:100%;border:1px solid #cad5d8;border-radius:9px;padding:9px 10px;font:inherit;color:var(--ink);background:#fff
+  }
+  .field textarea{min-height:92px;resize:vertical}
+  .status-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+  .status-btn{font-size:12px;text-align:left}
+  .dot{width:10px;height:10px;border-radius:50%;display:inline-block;margin-right:7px;vertical-align:-1px}
+  .empty{color:var(--muted);font-size:13px;line-height:1.45}
+  .legend-card{margin-top:14px;padding:16px}
+  .legend-grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+  .legend-section h3{font-size:15px;margin:0 0 10px}
+  .legend-list{display:grid;gap:7px}
+  .legend-item{display:flex;gap:9px;align-items:flex-start;padding:7px 8px;border-radius:8px;background:#f7f9fa}
+  .legend-symbol{flex:0 0 28px;height:28px;display:grid;place-items:center;font-weight:800;color:#223}
+  .legend-text{font-size:13px;line-height:1.35}
+  .legend-status{font-size:11px;color:var(--muted);margin-top:2px}
+  .hint{font-size:12px;color:var(--muted);margin:8px 2px 0}
+  .sep{width:1px;height:28px;background:#dde5e7;margin:0 2px}
+  .zoom-readout{min-width:54px;text-align:center;font-size:13px;font-weight:700;color:var(--muted)}
+  @media (max-width:1100px){.workspace{grid-template-columns:1fr}.inspector{position:static}}
+  .stage-details{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+  .stage-details>div{padding:10px;background:#f3f7f7;border-radius:10px;font-size:12px;line-height:1.42}
+  .stage-details p{margin:7px 0 0;color:#50666d}
+  @media(max-width:1000px){.stage-details{grid-template-columns:repeat(2,minmax(0,1fr))}}
+  @media(max-width:600px){.stage-details{grid-template-columns:1fr}}
+  @media print{
+    body{background:#fff}
+    .toolbar,.inspector,.hint{display:none!important}
+    .app{padding:0}
+    .workspace{display:block}
+    .canvas-card,.legend-card{box-shadow:none;border-radius:0}
+    .canvas-card{padding:0}
+    .canvas-wrap{overflow:visible}
+    #scene{width:100%!important}
+
+    /* PDF/print: legend compactsem ja joonisele lähemal */
+    .legend-card{
+      margin-top:4px!important;
+      padding:8px 10px!important;
+    }
+    .legend-grid{gap:12px!important}
+    .legend-section h3{margin-bottom:5px!important}
+    .legend-list{gap:3px!important}
+    .legend-item{
+      padding:3px 5px!important;
+      gap:5px!important;
+      background:transparent!important;
+    }
+    .legend-symbol{display:none!important}
+    .legend-status{display:none!important}
+    .legend-text{
+      font-size:11px!important;
+      line-height:1.2!important;
+    }
+    .legend-section > .legend-list > div[style]{
+      margin:1px 0 4px!important;
+    }
+    .legend-section > .legend-list > div[style] > div[style]{
+      margin:1px 0 3px!important;
+      padding:2px 4px!important;
+      font-size:10px!important;
+    }
+
+    /* PDF/print: aktiivne tegevusliin ei tohi eristuda */
+    .laneMain{
+      stroke:#274c5a!important;
+      stroke-width:4!important;
+    }
+  }
+</style>
+</head>
+<body>
+<div class="app">
+  <div class="toolbar">
+    <div style="margin-right:auto">
+      <h1 style="margin:0">Ühishange · tegevuskujustus <span style="color:#7b8f96;font-weight:500">v1.0</span></h1>
+      <div style="font-size:12px;color:#7b8f96;margin-top:2px;font-weight:600">5 punkti plaan · punkt 3.2 · nelja etapi põhine tegevuskujustus</div>
+    </div>
+
+    <button id="addTriangle">＋ Kolmnurk</button>
+    <button id="addStar">＋ Täht</button>
+
+    <span class="sep"></span>
+
+    <button id="addStage">＋ Etapp</button>
+    <button id="deleteStage">− Etapp</button>
+
+    <span class="sep"></span>
+
+    <button id="addLane">＋ Tegevusliin</button>
+    <button id="deleteLane">− Tegevusliin</button>
+
+    <span class="sep"></span>
+
+    <button id="zoomOut">−</button>
+    <span id="zoomReadout" class="zoom-readout">100%</span>
+    <button id="zoomIn">＋</button>
+    <button id="fitZoom">Mahuta</button>
+
+    <span class="sep"></span>
+
+    <button id="saveBtn">Salvesta</button>
+    <label class="file-label" for="loadFile">Ava</label>
+    <input id="loadFile" type="file" accept=".json,application/json">
+    <button onclick="window.print()">Prindi / PDF</button>
+    <button class="primary" id="resetBtn">Taasta Ühishange</button>
+  </div>
+
+  <div class="workspace">
+    <div>
+      <div class="canvas-card">
+        <div class="canvas-wrap" id="canvasWrap">
+          <svg id="scene" viewBox="0 0 1500 700" aria-label="Ühishanke tegevuskujustus"></svg>
+        </div>
+        <div class="hint">
+          Klõpsa soovitud tegevusliini joonel või kastil, et muuta see aktiivseks — uus kolmnurk või täht lisatakse sellele liinile.
+          Lohista markereid vasakule-paremale. Tekste saab muuta topeltklõpsuga.
+        </div>
+      </div>
+
+<div class="legend-card" style="margin-top:12px">
+  <h3 style="margin:0 0 10px">3.3. Etapiline jaotus · etapi algus, lõpp ja põhipingutus</h3>
+  <div class="stage-details">
+    <div><strong>I · Piloodi hindamine</strong><p>Algus: olemasoleva koodi ja testide ülevaatus. Lõpp: auditi- ja puuduste nimekirja kinnitamine. Põhipingutus: õigused, viis vormi ja terviklik hanketeekond.</p></div>
+    <div><strong>II · Täiustamine</strong><p>Algus: parandusnimekirja kinnitamine. Lõpp: kokkulepitud paranduste testide läbimine. Põhipingutus: kasutatavus, tingimusväljad ja pakkumuste selgus.</p></div>
+    <div><strong>III · Katsetamine</strong><p>Algus: testitava versiooni ja osalejate määramine. Lõpp: tulemuste ja riskide dokumenteerimine. Põhipingutus: prooviostud ning TEST-maksete ja lepingute kontroll.</p></div>
+    <div><strong>IV · Kasutuselevõtu ettevalmistus</strong><p>Algus: katsetulemuste heakskiitmine. Lõpp: GO/NO-GO otsus. Põhipingutus: pärismaksete, turbe, andmekaitse, toe ja majutuse valmisolek.</p></div>
+  </div>
+  <p class="hint" style="margin-top:10px">Võtmetulemused (kolmnurgad) ja otsustuskohad (tähed) on kavandatavad juhtimis- ja kontrollpunktid, mitte väide tööde valmimise kohta. Algus- ja lõputingimused on sündmuspõhised; kinnitatud tähtaegu ei ole alusplaanis antud.</p>
+</div>
+      <div class="legend-card">
+        <div class="legend-grid">
+          <section class="legend-section">
+            <h3>Võtmetulemused</h3>
+            <div id="triangleLegend" class="legend-list"></div>
+          </section>
+          <section class="legend-section">
+            <h3>Otsustuskohad</h3>
+            <div id="starLegend" class="legend-list"></div>
+          </section>
+        </div>
+      </div>
+    </div>
+
+    <aside class="inspector">
+      <h2>Valitud element</h2>
+      <div id="emptyInspector" class="empty">
+        Klõpsa kolmnurgal, tähel, etapil või tegevusliinil, et seda muuta.
+      </div>
+
+      <div id="markerInspector" hidden>
+        <div class="field"><label>Tüüp</label><input id="markerType" disabled></div>
+        <div class="field"><label>Kirjeldus</label><textarea id="markerText"></textarea></div>
+        <div class="field"><label>Tegevusliin</label><select id="markerLane"></select></div>
+        <div class="field" id="statusField">
+          <label>Staatus</label>
+          <div class="status-grid">
+            <button class="status-btn" data-status="not_started"><span class="dot" style="background:var(--grey)"></span>Ei alustatud</button>
+            <button class="status-btn" data-status="in_progress"><span class="dot" style="background:var(--yellow)"></span>Töös</button>
+            <button class="status-btn" data-status="achieved"><span class="dot" style="background:var(--green)"></span>Saavutatud</button>
+            <button class="status-btn" data-status="at_risk"><span class="dot" style="background:var(--red)"></span>Ohus</button>
+          </div>
+        </div>
+        <button id="deleteMarker" style="width:100%;margin-top:4px">Kustuta element</button>
+      </div>
+
+      <div id="stageInspector" hidden>
+        <div class="field"><label>Etapi nimi</label><input id="stageName"></div>
+        <button id="deleteSelectedStage" style="width:100%">Kustuta valitud etapp</button>
+      </div>
+
+      <div id="laneInspector" hidden>
+        <div class="field"><label>Tegevusliini nimi</label><input id="laneName"></div>
+        <div class="field"><label>Alaeesmärk</label><textarea id="laneObjective"></textarea></div>
+        <button id="deleteSelectedLane" style="width:100%">Kustuta valitud tegevusliin</button>
+      </div>
+
+      <hr style="border:0;border-top:1px solid #e2e8ea;margin:18px 0">
+      <h2>Kujunduse tekstid</h2>
+      <div class="field">
+        <label>Projekti eesmärk</label>
+        <textarea id="mainObjective" style="min-height:90px"></textarea>
+      </div>
+      <div class="empty">
+        Etappide, tegevusliinide ja alaeesmärkide tekste saab muuta ka otse joonisel topeltklõpsuga.
+      </div>
+    </aside>
+  </div>
+</div>
+
+<script>
+const svg=document.getElementById('scene');
+const canvasWrap=document.getElementById('canvasWrap');
+
+const statusMeta={
+  not_started:{label:'Ei alustatud',color:'#9aa5aa'},
+  in_progress:{label:'Töös',color:'#f0c419'},
+  achieved:{label:'Saavutatud',color:'#4caf50'},
+  at_risk:{label:'Ohus',color:'#d9534f'}
+};
+
+const initialState=()=>({
+  "stages": [
+    {
+      "id": "s1",
+      "name": "I · PILOODI HINDAMINE"
+    },
+    {
+      "id": "s2",
+      "name": "II · TÄIUSTAMINE"
+    },
+    {
+      "id": "s3",
+      "name": "III · KATSETAMINE"
+    },
+    {
+      "id": "s4",
+      "name": "IV · KASUTUSELEVÕTT"
+    }
+  ],
+  "lanes": [
+    {
+      "id": "l1",
+      "name": "VORMID JA HANKE ALGATAMINE",
+      "objective": "Viis teenusevormi ja selge hanke algatamine"
+    },
+    {
+      "id": "l2",
+      "name": "ÜHISTUTE KAASAMINE",
+      "objective": "Õiguspärane kaasamine ja juhitud osalemine"
+    },
+    {
+      "id": "l3",
+      "name": "PAKKUMUSED JA LEPINGUD",
+      "objective": "Võrreldavad hinnad ja säilivad kokkulepped"
+    },
+    {
+      "id": "l4",
+      "name": "TEHNIKA JA VALMISOLEK",
+      "objective": "Kontrollitud piloot ja turvaline juurutusotsus"
+    }
+  ],
+  "mainObjective": "Korteriühistud saavad turvaliselt koondada teenusenõudluse, võrrelda pakkumusi ja sõlmida jälgitavaid kokkuleppeid; tootmiskasutus toimub üksnes eraldi valmisolekuotsuse järel.",
+  "markers": [
+    {
+      "id": "m1",
+      "type": "triangle",
+      "laneId": "l1",
+      "x": 265,
+      "text": "I etapp: viie hankevormi ja tingimusväljade audit on tehtud",
+      "status": "not_started"
+    },
+    {
+      "id": "m2",
+      "type": "triangle",
+      "laneId": "l2",
+      "x": 320,
+      "text": "I etapp: ostja, naaberühistu, pakkuja ja administraatori töövood on hinnatud",
+      "status": "not_started"
+    },
+    {
+      "id": "m3",
+      "type": "triangle",
+      "laneId": "l4",
+      "x": 345,
+      "text": "I etapp: puudused, riskid ja järgmise etapi nõuded on kinnitatud",
+      "status": "not_started"
+    },
+    {
+      "id": "m4",
+      "type": "star",
+      "laneId": "l4",
+      "x": 385,
+      "text": "O1 · Kas auditi tulemused ja prioriteetne paranduskava on kinnitatud?"
+    },
+    {
+      "id": "m5",
+      "type": "triangle",
+      "laneId": "l1",
+      "x": 478,
+      "text": "II etapp: vormid, valideerimine ja veateated on ühtlustatud",
+      "status": "not_started"
+    },
+    {
+      "id": "m6",
+      "type": "triangle",
+      "laneId": "l2",
+      "x": 520,
+      "text": "II etapp: kutsed, järgmised tegevused ja mobiilikasutus on selged",
+      "status": "not_started"
+    },
+    {
+      "id": "m7",
+      "type": "triangle",
+      "laneId": "l3",
+      "x": 560,
+      "text": "II etapp: pakkumiste hinnavõrdlus ja lepingutingimuste esitlus on kontrollitud",
+      "status": "not_started"
+    },
+    {
+      "id": "m8",
+      "type": "star",
+      "laneId": "l1",
+      "x": 607,
+      "text": "O2 · Kas parandused on testitud ja pilootkatseks valmis?"
+    },
+    {
+      "id": "m9",
+      "type": "triangle",
+      "laneId": "l2",
+      "x": 710,
+      "text": "III etapp: korteriühistute ja pakkujate proovihanked on tehtud",
+      "status": "not_started"
+    },
+    {
+      "id": "m10",
+      "type": "triangle",
+      "laneId": "l3",
+      "x": 750,
+      "text": "III etapp: hinnatasemete, taganemise ja TEST-maksete stsenaariumid on läbi mängitud",
+      "status": "not_started"
+    },
+    {
+      "id": "m11",
+      "type": "triangle",
+      "laneId": "l4",
+      "x": 785,
+      "text": "III etapp: tagasiside, riskid ja kasutuskatsete tulemused on dokumenteeritud",
+      "status": "not_started"
+    },
+    {
+      "id": "m12",
+      "type": "star",
+      "laneId": "l3",
+      "x": 830,
+      "text": "O3 · Kas pilootkatse tulemused võimaldavad tootmiskasutust ette valmistada?"
+    },
+    {
+      "id": "m13",
+      "type": "triangle",
+      "laneId": "l3",
+      "x": 915,
+      "text": "IV etapp: pärismaksete, lepingu- ja kasutustingimuste lahendus on kavandatud",
+      "status": "not_started"
+    },
+    {
+      "id": "m14",
+      "type": "triangle",
+      "laneId": "l4",
+      "x": 963,
+      "text": "IV etapp: majutus, turve, tugi, andmekaitse ja taastamine on hinnatud",
+      "status": "not_started"
+    },
+    {
+      "id": "m15",
+      "type": "star",
+      "laneId": "l4",
+      "x": 1030,
+      "text": "O4 · Kas anda GO/NO-GO otsus avalikuks juurutuseks?"
+    }
+  ]
+});
+
+let state=initialState();
+let selectedId=null;
+let selectedStageId=null;
+let selectedLaneId='l1';
+let drag=null;
+let zoom=1;
+
+function esc(s){
+  return String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+}
+function laneById(id){return state.lanes.find(l=>l.id===id)}
+function markerById(id){return state.markers.find(m=>m.id===id)}
+function stageById(id){return state.stages.find(s=>s.id===id)}
+
+function laneLayout(){
+  const firstY=150, gap=120;
+  const map={};
+  state.lanes.forEach((l,i)=>map[l.id]=firstY+i*gap);
+  return map;
+}
+
+function canvasHeight(){
+  return Math.max(700, 220 + Math.max(1,state.lanes.length-1)*120 + 170);
+}
+
+function visibleNumbers(type){
+  const lm=laneLayout();
+  return state.markers.filter(m=>m.type===type).slice()
+    .sort((a,b)=>a.x-b.x || (lm[a.laneId]||0)-(lm[b.laneId]||0))
+    .map((m,i)=>[m.id,i+1]);
+}
+function numberMap(type){return Object.fromEntries(visibleNumbers(type))}
+
+function starPoints(cx,cy,r1=18,r2=8,n=5){
+  const pts=[];
+  for(let i=0;i<n*2;i++){
+    const a=-Math.PI/2+i*Math.PI/n,r=i%2===0?r1:r2;
+    pts.push(`${cx+Math.cos(a)*r},${cy+Math.sin(a)*r}`);
+  }
+  return pts.join(' ');
+}
+
+function wrapLines(text,maxChars){
+  const words=String(text||'').trim().split(/\s+/).filter(Boolean);
+  if(!words.length)return[''];
+  const lines=[];let line='';
+  words.forEach(w=>{
+    const candidate=line?line+' '+w:w;
+    if(candidate.length<=maxChars||!line)line=candidate;
+    else{lines.push(line);line=w;}
+  });
+  if(line)lines.push(line);
+  return lines;
+}
+
+function wrappedText(x,y,text,width,fontSize=13,fontWeight=700,fill='#29454d',anchor='middle',lineH=16){
+  const maxChars=Math.max(8,Math.floor(width/(fontSize*.58)));
+  const lines=wrapLines(text,maxChars);
+  const startY=y-((lines.length-1)*lineH)/2;
+  return `<text x="${x}" y="${startY}" text-anchor="${anchor}" font-size="${fontSize}" font-weight="${fontWeight}" fill="${fill}">`+
+    lines.map((ln,i)=>`<tspan x="${x}" dy="${i===0?0:lineH}">${esc(ln)}</tspan>`).join('')+
+    `</text>`;
+}
+
+function calcBoxHeight(text,width,fontSize=13,minH=60,pad=14){
+  const maxChars=Math.max(8,Math.floor(width/(fontSize*.58)));
+  const lines=wrapLines(text,maxChars).length;
+  return Math.max(minH,lines*(fontSize+4)+pad*2-6);
+}
+
+function objectiveBlock(x,centerY,width,label,text){
+  const labelSize=11, bodySize=14, bodyLineH=18;
+  const maxChars=Math.max(8,Math.floor((width-24)/(bodySize*.58)));
+  const bodyLines=wrapLines(text,maxChars);
+  const labelH=18, gap=12, padTop=16, padBottom=16;
+  const bodyH=Math.max(bodyLineH,bodyLines.length*bodyLineH);
+  const height=Math.max(112,padTop+labelH+gap+bodyH+padBottom);
+  const top=centerY-height/2;
+  const labelY=top+padTop+labelH-4;
+  const bodyStartY=labelY+gap+bodyLineH;
+
+  const labelSvg=wrappedText(x+width/2,labelY,label,width-24,labelSize,700,'#50666d','middle',14);
+  const bodySvg=`<text x="${x+width/2}" y="${bodyStartY}" text-anchor="middle" font-size="${bodySize}" font-weight="800" fill="#29454d">`+
+    bodyLines.map((ln,i)=>`<tspan x="${x+width/2}" dy="${i===0?0:bodyLineH}">${esc(ln)}</tspan>`).join('')+
+    `</text>`;
+
+  return {
+    height,
+    svg:`<rect x="${x}" y="${top}" width="${width}" height="${height}" rx="14" fill="#d9e5df" stroke="#aebfb7"/>
+         ${labelSvg}
+         ${bodySvg}`
+  };
+}
+
+function render(){
+  const H=canvasHeight();
+  svg.setAttribute('viewBox',`0 0 1500 ${H}`);
+  updateZoom();
+
+  const triNums=numberMap('triangle'),starNums=numberMap('star');
+  const lm=laneLayout();
+
+  const laneStart=185,laneEnd=1080,subX=1110,subW=160,objectiveX=1310,objectiveW=165;
+  const stageStart=170,stageEnd=1075;
+  const stageW=(stageEnd-stageStart)/Math.max(1,state.stages.length);
+  const lastLaneY=state.lanes.length?lm[state.lanes[state.lanes.length-1].id]:150;
+  const separatorBottom=lastLaneY+55;
+
+  let out=`
+    <defs>
+      <marker id="arrow" markerWidth="10" markerHeight="10" refX="8" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L9,3 z" fill="#274c5a"></path>
+      </marker>
+      <marker id="arrowSmall" markerWidth="8" markerHeight="8" refX="7" refY="3" orient="auto">
+        <path d="M0,0 L0,6 L8,3 z" fill="#7f969e"></path>
+      </marker>
+      <filter id="shadow" x="-20%" y="-20%" width="140%" height="140%">
+        <feDropShadow dx="0" dy="2" stdDeviation="2" flood-color="#000" flood-opacity=".12"/>
+      </filter>
+    </defs>
+    <rect x="0" y="0" width="1500" height="${H}" rx="14" fill="#fff"/>
+  `;
+
+  state.stages.forEach((s,i)=>{
+    const x=stageStart+i*stageW;
+    const selected=s.id===selectedStageId;
+    out+=`
+      <rect x="${x+4}" y="30" width="${Math.max(90,stageW-8)}" height="44" rx="8"
+        fill="${selected?'#5f8d92':'#7aa4a8'}" opacity=".97" class="stageHeader" data-id="${s.id}" style="cursor:pointer"/>
+      <g class="stageLabel" data-id="${s.id}" style="pointer-events:none">${wrappedText(x+stageW/2,55,s.name,stageW-24,15,800,'#fff')}</g>
+    `;
+    if(i>0)out+=`<line x1="${x}" y1="86" x2="${x}" y2="${separatorBottom}" stroke="#cfd8dc" stroke-width="2" stroke-dasharray="6 8"/>`;
+  });
+
+  state.lanes.forEach(l=>{
+    const y=lm[l.id];
+    const laneH=calcBoxHeight(l.name,125,13,60,10);
+    const objH=calcBoxHeight(l.objective,subW,13,68,12);
+    const selected=l.id===selectedLaneId;
+
+    out+=`
+      <rect x="24" y="${y-laneH/2}" width="125" height="${laneH}" rx="10"
+        fill="${selected?'#1f3f4a':'#274c5a'}" stroke="${selected?'#2f6b7a':'none'}" stroke-width="3"
+        class="laneBox" data-id="${l.id}" style="cursor:pointer"/>
+      <g style="pointer-events:none">${wrappedText(86.5,y,l.name,105,13,800,'#fff')}</g>
+
+      <line class="laneMain" x1="${laneStart}" y1="${y}" x2="${laneEnd}" y2="${y}"
+        stroke="${selected?'#2f6b7a':'#274c5a'}" stroke-width="${selected?7:4}" marker-end="url(#arrow)"/>
+      <line x1="${laneStart}" y1="${y-10}" x2="${laneEnd}" y2="${y-10}" stroke="transparent" stroke-width="24"
+        class="laneHit" data-id="${l.id}" style="cursor:pointer"/>
+
+      <rect x="${subX}" y="${y-objH/2}" width="${subW}" height="${objH}" rx="12" fill="#c7d7cf" stroke="#9fb4aa"/>
+      <g style="pointer-events:none">${wrappedText(subX+subW/2,y,l.objective,subW-22,13,700,'#29454d')}</g>
+      <rect x="${subX}" y="${y-objH/2}" width="${subW}" height="${objH}" rx="12" fill="transparent"
+        class="editableHit" data-kind="objective" data-id="${l.id}" style="cursor:text"/>
+
+      <line x1="${subX+subW}" y1="${y}" x2="${objectiveX-12}" y2="${y}" stroke="#7f969e" stroke-width="2" marker-end="url(#arrowSmall)"/>
+    `;
+  });
+
+  const firstY=state.lanes.length?lm[state.lanes[0].id]:150;
+  const mainY=(firstY+lastLaneY)/2;
+  const mainBlock=objectiveBlock(objectiveX,mainY,objectiveW,'PROJEKTI EESMÄRK',state.mainObjective);
+  out+=mainBlock.svg;
+
+  state.markers.forEach(m=>{
+    const y=lm[m.laneId];
+    if(y==null)return;
+    const selected=m.id===selectedId;
+    if(m.type==='triangle'){
+      const fill=statusMeta[m.status||'not_started'].color;
+      out+=`
+      <g class="marker" data-id="${m.id}" style="cursor:grab">
+        ${selected?`<circle cx="${m.x}" cy="${y}" r="31" fill="none" stroke="#2f6b7a" stroke-width="3" stroke-dasharray="4 4"/>`:''}
+        <polygon points="${m.x},${y-24} ${m.x-23},${y+20} ${m.x+23},${y+20}" fill="${fill}" stroke="#34464d" stroke-width="2" filter="url(#shadow)"/>
+        <text x="${m.x}" y="${y+8}" text-anchor="middle" font-size="14" font-weight="900" fill="#172c33">${triNums[m.id]}</text>
+      </g>`;
+    }else{
+      out+=`
+      <g class="marker" data-id="${m.id}" style="cursor:grab">
+        ${selected?`<circle cx="${m.x}" cy="${y}" r="31" fill="none" stroke="#2f6b7a" stroke-width="3" stroke-dasharray="4 4"/>`:''}
+        <polygon points="${starPoints(m.x,y,22,9)}" fill="#f5a623" stroke="#6d5418" stroke-width="2" filter="url(#shadow)"/>
+        <text x="${m.x}" y="${y+5}" text-anchor="middle" font-size="12" font-weight="900" fill="#2a2413">${starNums[m.id]}</text>
+      </g>`;
+    }
+  });
+
+  svg.innerHTML=out;
+  wireSvgEvents();
+  renderLegends();
+  renderInspector();
+}
+
+function renderLegends(){
+  const triNums=numberMap('triangle'),starNums=numberMap('star');
+  const tri=document.getElementById('triangleLegend'),star=document.getElementById('starLegend');
+
+  // Võtmetulemused: tegevusliinide kaupa
+  let triHtml='';
+  state.lanes.forEach(l=>{
+    const items=state.markers
+      .filter(m=>m.type==='triangle' && m.laneId===l.id)
+      .sort((a,b)=>triNums[a.id]-triNums[b.id]);
+
+    if(!items.length) return;
+
+    triHtml += `<div style="margin:4px 0 10px">
+      <div style="font-size:12px;font-weight:800;color:#49636c;text-transform:uppercase;letter-spacing:.03em;margin:2px 0 6px;padding:5px 7px;background:#edf4f5;border-radius:7px">
+        ${esc(l.name)}
+      </div>`;
+
+    items.forEach(m=>{
+      const sm=statusMeta[m.status||'not_started'];
+      triHtml += `<div class="legend-item" data-id="${m.id}">
+        <div class="legend-symbol">
+          <svg width="26" height="26" viewBox="0 0 26 26">
+            <polygon points="13,2 2,23 24,23" fill="${sm.color}" stroke="#45565c" stroke-width="1.5"/>
+            <text x="13" y="19" text-anchor="middle" font-size="10" font-weight="800">${triNums[m.id]}</text>
+          </svg>
+        </div>
+        <div class="legend-text"><strong>${triNums[m.id]}.</strong> ${esc(m.text)}<div class="legend-status">${sm.label}</div></div>
+      </div>`;
+    });
+
+    triHtml += `</div>`;
+  });
+
+  tri.innerHTML = triHtml || `<div class="empty">Võtmetulemusi pole veel lisatud.</div>`;
+
+  // Otsustuskohad: üks lihtne loetelu, tegevusliinide kaupa ei grupeerita
+  const starOrdered=state.markers
+    .filter(m=>m.type==='star')
+    .sort((a,b)=>starNums[a.id]-starNums[b.id]);
+
+  star.innerHTML=starOrdered.length
+    ? starOrdered.map(m=>`
+      <div class="legend-item" data-id="${m.id}">
+        <div class="legend-symbol">
+          <svg width="28" height="28" viewBox="0 0 28 28">
+            <polygon points="${starPoints(14,14,12,5,5)}" fill="#f5a623" stroke="#6d5418" stroke-width="1.3"/>
+            <text x="14" y="18" text-anchor="middle" font-size="9" font-weight="800">${starNums[m.id]}</text>
+          </svg>
+        </div>
+        <div class="legend-text"><strong>${starNums[m.id]}.</strong> ${esc(m.text)}</div>
+      </div>`).join('')
+    : `<div class="empty">Otsustuskohti pole veel lisatud.</div>`;
+
+  document.querySelectorAll('.legend-item').forEach(el=>el.onclick=()=>{
+    selectedId=el.dataset.id;
+    selectedStageId=null;
+    selectedLaneId=markerById(el.dataset.id)?.laneId || null;
+    render();
+  });
+}
+function renderInspector(){
+  const empty=document.getElementById('emptyInspector');
+  const markerPanel=document.getElementById('markerInspector');
+  const stagePanel=document.getElementById('stageInspector');
+  const lanePanel=document.getElementById('laneInspector');
+
+  const m=markerById(selectedId),s=stageById(selectedStageId),l=laneById(selectedLaneId);
+
+  markerPanel.hidden=true;stagePanel.hidden=true;lanePanel.hidden=true;
+
+  if(m){
+    empty.hidden=true;markerPanel.hidden=false;
+    document.getElementById('markerType').value=m.type==='triangle'?'Kolmnurk':'Täht';
+    document.getElementById('markerText').value=m.text;
+    document.getElementById('markerLane').innerHTML=state.lanes.map(x=>`<option value="${x.id}" ${x.id===m.laneId?'selected':''}>${esc(x.name)}</option>`).join('');
+    document.getElementById('statusField').hidden=m.type!=='triangle';
+  }else if(s){
+    empty.hidden=true;stagePanel.hidden=false;
+    document.getElementById('stageName').value=s.name;
+  }else if(l){
+    empty.hidden=true;lanePanel.hidden=false;
+    document.getElementById('laneName').value=l.name;
+    document.getElementById('laneObjective').value=l.objective;
+  }else{
+    empty.hidden=false;
+  }
+  document.getElementById('mainObjective').value=state.mainObjective;
+}
+
+function pointerToSvg(evt){
+  const pt=svg.createSVGPoint();pt.x=evt.clientX;pt.y=evt.clientY;
+  return pt.matrixTransform(svg.getScreenCTM().inverse());
+}
+
+function wireSvgEvents(){
+  svg.querySelectorAll('.marker').forEach(el=>{
+    el.addEventListener('pointerdown',e=>{
+      const id=el.dataset.id;selectedId=id;selectedStageId=null;selectedLaneId=markerById(id)?.laneId||null;
+      const p=pointerToSvg(e);drag={id,startX:p.x,originX:markerById(id).x};
+      el.setPointerCapture(e.pointerId);renderInspector();e.preventDefault();
+    });
+  });
+
+  svg.querySelectorAll('.stageHeader').forEach(el=>{
+    el.addEventListener('click',()=>{
+      selectedStageId=el.dataset.id;selectedId=null;selectedLaneId=null;render();
+    });
+    el.addEventListener('dblclick',()=>{
+      const s=stageById(el.dataset.id);if(!s)return;
+      const next=prompt('Muuda etapi nime:',s.name);
+      if(next!==null){s.name=next;render();}
+    });
+  });
+
+  svg.querySelectorAll('.laneBox').forEach(el=>{
+    el.addEventListener('click',()=>{
+      selectedLaneId=el.dataset.id;selectedId=null;selectedStageId=null;render();
+    });
+    el.addEventListener('dblclick',()=>{
+      const l=laneById(el.dataset.id);if(!l)return;
+      const next=prompt('Muuda tegevusliini nime:',l.name);
+      if(next!==null){l.name=next;render();}
+    });
+  });
+
+  svg.querySelectorAll('.laneHit').forEach(el=>{
+    el.addEventListener('click',e=>{
+      selectedLaneId=el.dataset.id;
+      selectedId=null;
+      selectedStageId=null;
+      render();
+      e.stopPropagation();
+    });
+  });
+
+  svg.querySelectorAll('.editableHit').forEach(el=>{
+    el.addEventListener('dblclick',()=>{
+      const id=el.dataset.id,l=laneById(id);if(!l)return;
+      const next=prompt('Muuda alaeesmärki:',l.objective);
+      if(next!==null){l.objective=next;render();}
+    });
+  });
+}
+
+svg.addEventListener('pointermove',e=>{
+  if(!drag)return;
+  const p=pointerToSvg(e),m=markerById(drag.id);
+  m.x=Math.max(205,Math.min(1050,drag.originX+(p.x-drag.startX)));
+  render();
+});
+svg.addEventListener('pointerup',()=>drag=null);
+svg.addEventListener('pointercancel',()=>drag=null);
+
+document.getElementById('markerText').addEventListener('input',e=>{
+  const m=markerById(selectedId);if(!m)return;m.text=e.target.value;renderLegends();
+});
+document.getElementById('markerLane').addEventListener('change',e=>{
+  const m=markerById(selectedId);if(!m)return;m.laneId=e.target.value;selectedLaneId=e.target.value;render();
+});
+document.querySelectorAll('.status-btn').forEach(b=>b.addEventListener('click',()=>{
+  const m=markerById(selectedId);if(!m||m.type!=='triangle')return;m.status=b.dataset.status;render();
+}));
+document.getElementById('deleteMarker').addEventListener('click',()=>{
+  if(!selectedId)return;state.markers=state.markers.filter(m=>m.id!==selectedId);selectedId=null;render();
+});
+
+document.getElementById('mainObjective').addEventListener('input',e=>{
+  state.mainObjective=e.target.value;render();
+});
+document.getElementById('stageName').addEventListener('input',e=>{
+  const s=stageById(selectedStageId);if(!s)return;s.name=e.target.value;render();
+});
+document.getElementById('laneName').addEventListener('input',e=>{
+  const l=laneById(selectedLaneId);if(!l)return;l.name=e.target.value;render();
+});
+document.getElementById('laneObjective').addEventListener('input',e=>{
+  const l=laneById(selectedLaneId);if(!l)return;l.objective=e.target.value;render();
+});
+
+document.getElementById('addTriangle').addEventListener('click',()=>addMarker('triangle'));
+document.getElementById('addStar').addEventListener('click',()=>addMarker('star'));
+
+function addMarker(type){
+  if(!state.lanes.length){alert('Lisa enne vähemalt üks tegevusliin.');return;}
+  const targetLane = laneById(selectedLaneId) || state.lanes[0];
+  const id='m'+Date.now();
+  state.markers.push({
+    id,type,laneId:targetLane.id,x:300,
+    text:type==='triangle'?'Uus võtmetulemus':'Uus otsustuskoht',
+    ...(type==='triangle'?{status:'not_started'}:{})
+  });
+  selectedId=id;
+  selectedStageId=null;
+  selectedLaneId=targetLane.id;
+  render();
+}
+
+function addStage(){
+  const id='s'+Date.now();
+  state.stages.push({id,name:`${state.stages.length+1}. ETAPP`});
+  selectedStageId=id;selectedId=null;selectedLaneId=null;render();
+}
+function deleteStage(id){
+  if(state.stages.length<=1){alert('Vähemalt üks etapp peab alles jääma.');return;}
+  const target=id||selectedStageId||state.stages[state.stages.length-1].id;
+  state.stages=state.stages.filter(s=>s.id!==target);
+  selectedStageId=null;
+  state.stages.forEach((s,i)=>{
+    if(/^\d+\.\s*ETAPP$/i.test(s.name))s.name=`${i+1}. ETAPP`;
+  });
+  render();
+}
+document.getElementById('addStage').addEventListener('click',addStage);
+document.getElementById('deleteStage').addEventListener('click',()=>deleteStage());
+document.getElementById('deleteSelectedStage').addEventListener('click',()=>deleteStage(selectedStageId));
+
+function addLane(){
+  const id='l'+Date.now();
+  const n=state.lanes.length+1;
+  state.lanes.push({id,name:`TEGEVUSLIIN ${n}`,objective:`Alaeesmärk ${n}`});
+  selectedLaneId=id;selectedId=null;selectedStageId=null;render();
+}
+function deleteLane(id){
+  if(state.lanes.length<=1){alert('Vähemalt üks tegevusliin peab alles jääma.');return;}
+  const target=id||selectedLaneId||state.lanes[state.lanes.length-1].id;
+  const lane=laneById(target); if(!lane)return;
+
+  const markerCount=state.markers.filter(m=>m.laneId===target).length;
+  if(markerCount && !confirm(`Sellel tegevusliinil on ${markerCount} marker(it). Kas kustutada tegevusliin koos nende markeritega?`))return;
+
+  state.markers=state.markers.filter(m=>m.laneId!==target);
+  state.lanes=state.lanes.filter(l=>l.id!==target);
+  selectedLaneId=state.lanes[0]?.id || null;
+
+  state.lanes.forEach((l,i)=>{
+    if(/^TEGEVUSLIIN\s+\d+$/i.test(l.name))l.name=`TEGEVUSLIIN ${i+1}`;
+    if(/^Alaeesmärk\s+\d+$/i.test(l.objective))l.objective=`Alaeesmärk ${i+1}`;
+  });
+  render();
+}
+document.getElementById('addLane').addEventListener('click',addLane);
+document.getElementById('deleteLane').addEventListener('click',()=>deleteLane());
+document.getElementById('deleteSelectedLane').addEventListener('click',()=>deleteLane(selectedLaneId));
+
+function updateZoom(){
+  svg.style.width=`${1500*zoom}px`;
+  document.getElementById('zoomReadout').textContent=`${Math.round(zoom*100)}%`;
+}
+function setZoom(value){
+  zoom=Math.max(.4,Math.min(1.6,value));
+  updateZoom();
+}
+document.getElementById('zoomIn').addEventListener('click',()=>setZoom(zoom+.1));
+document.getElementById('zoomOut').addEventListener('click',()=>setZoom(zoom-.1));
+document.getElementById('fitZoom').addEventListener('click',()=>{
+  const available=Math.max(300,canvasWrap.clientWidth-8);
+  setZoom(Math.min(1,available/1500));
+});
+
+document.getElementById('saveBtn').addEventListener('click',()=>{
+  const blob=new Blob([JSON.stringify(state,null,2)],{type:'application/json'});
+  const url=URL.createObjectURL(blob),a=document.createElement('a');
+  a.href=url;a.download='uhishange-kujustus.json';a.click();URL.revokeObjectURL(url);
+});
+
+document.getElementById('loadFile').addEventListener('change',e=>{
+  const file=e.target.files[0];if(!file)return;
+  const reader=new FileReader();
+  reader.onload=()=>{
+    try{
+      state=JSON.parse(reader.result);
+
+      // Backwards compatibility with v0.1 / v0.2.
+      state.stages=(state.stages||[]).map((s,i)=>({id:s.id||('s'+i),name:s.name||`${i+1}. ETAPP`}));
+      state.lanes=(state.lanes||[]).map((l,i)=>({
+        id:l.id||('l'+i),
+        name:l.name||`TEGEVUSLIIN ${i+1}`,
+        objective:l.objective||`Alaeesmärk ${i+1}`
+      }));
+
+      selectedId=null;selectedStageId=null;selectedLaneId=state.lanes[0]?.id||null;render();
+    }catch(err){alert('Faili ei õnnestunud avada.');}
+  };
+  reader.readAsText(file);e.target.value='';
+});
+
+document.getElementById('resetBtn').addEventListener('click',()=>{
+  if(confirm('Taastan Ühishange algse kujustuse?')){
+    state=initialState();selectedId=null;selectedStageId=null;selectedLaneId=state.lanes[0]?.id||null;zoom=1;render();
+  }
+});
+
+render();
+</script>
+</body>
+</html>
