@@ -1,11 +1,10 @@
 import type { ReactNode } from 'react';
 import type { AcceptanceSnapshot, FinalContractSnapshot, Organization } from '../shared/types';
-import { date, euro } from './api';
+import { date, euro, number } from './api';
 import { isSnowService, serviceLabel } from '../shared/serviceForms';
 import ServiceScope from './ServiceScope';
 
 type Snapshot = AcceptanceSnapshot | FinalContractSnapshot;
-const number = (value: number) => new Intl.NumberFormat('et-EE').format(value);
 
 function Fact({ label, children }: { label: string; children: ReactNode }) {
   return (

@@ -11,5 +11,7 @@ test-results/
 
 backups/
 
+recordings/
+
 # Original event poster contains participant names; retain locally.
 /1000012998.jpg

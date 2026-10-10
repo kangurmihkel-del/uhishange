@@ -1,5 +1,6 @@
 import type { ServiceAnswers, ServiceAnswer } from '../shared/types';
 import { visibleServiceFields, type ServiceForm } from '../shared/serviceForms';
+import { RegionalNumberInput, RegionalDateInput } from './RegionalInputs';
 
 export interface ServiceFieldIssue {
   fieldId: string;
@@ -129,23 +130,30 @@ export default function ServiceFields({
                   </option>
                 ))}
               </select>
+            ) : field.type === 'number' ? (
+              <RegionalNumberInput
+                {...props}
+                value={typeof value === 'string' || typeof value === 'number' ? value : ''}
+                min={field.min}
+                max={field.max}
+                step={field.step}
+                decimalPlaces={field.step === 1 ? 0 : undefined}
+                onValueChange={(raw) => onChange(field.id, raw)}
+              />
+            ) : field.type === 'date' ? (
+              <RegionalDateInput
+                {...props}
+                calendarLabel={field.label}
+                value={typeof value === 'string' ? value : ''}
+                onValueChange={(raw) => onChange(field.id, raw)}
+              />
             ) : (
               <input
                 {...props}
-                type={field.type}
-                value={typeof value === 'string' || typeof value === 'number' ? value : ''}
-                min={field.min}
-                max={field.type === 'number' ? field.max : undefined}
-                step={field.step}
-                maxLength={field.type === 'text' ? field.max : undefined}
-                onChange={(event) =>
-                  onChange(
-                    field.id,
-                    field.type === 'number' && event.target.value !== ''
-                      ? Number(event.target.value)
-                      : event.target.value,
-                  )
-                }
+                type="text"
+                value={typeof value === 'string' ? value : ''}
+                maxLength={field.max}
+                onChange={(event) => onChange(field.id, event.target.value)}
               />
             )}
             {help}

@@ -694,9 +694,9 @@ export function validateServiceAnswers(
           ': kontrolli väärtust' +
           (field.type === 'number'
             ? ' (lubatud ' +
-              field.min +
+              (field.min === undefined ? 'piiranguta' : numberFormat.format(field.min)) +
               '–' +
-              field.max +
+              (field.max === undefined ? 'piiranguta' : numberFormat.format(field.max)) +
               (field.step === 1 ? ', täisarv' : '') +
               ')'
             : '') +
@@ -722,8 +722,16 @@ export function serviceLabel(spec: ProcurementSpec): string {
     ? (findServiceForm(spec.formId, spec.version)?.label ?? 'Tundmatu hanketeenus')
     : 'Lumekoristus';
 }
-const numberFormat = new Intl.NumberFormat('et-EE');
-const dateFormat = new Intl.DateTimeFormat('et-EE', { timeZone: 'Europe/Tallinn' });
+const numberFormat = new Intl.NumberFormat('et-EE', {
+  useGrouping: 'always',
+  maximumFractionDigits: 20,
+});
+const dateFormat = new Intl.DateTimeFormat('et-EE', {
+  timeZone: 'Europe/Tallinn',
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+});
 function dateLabel(value: string): string {
   return validCalendarDate(value) ? dateFormat.format(new Date(value + 'T12:00:00Z')) : value;
 }

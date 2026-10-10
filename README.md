@@ -51,6 +51,10 @@ Acceptance details and final contracts show the saved agreement in Estonian, inc
 
 Before success, withdrawal refunds the deposit. After success, withdrawal retains it. Failed groups and supplier cancellation refund all deposits. Cancellation after payout creates reversing entries without deleting history. Remaining service balances are billed directly outside this pilot.
 
+Dates and form entry use Estonian `DD.MM.YYYY` and 24-hour Tallinn time. Prices and quantities accept a decimal comma and space grouping, for example `1 000,03`. Money converts directly to integer cents. Coordinates display with decimal commas and a semicolon between latitude and longitude; CSV/API machine formats stay unchanged. [Regional formats](docs/Features/RegionalFormats.md) records the input rules.
+
+The [full process recording](docs/Demo.md) can be reproduced with `node scripts/record-demo.mjs` after building. It uses a separate recording database and localhost:3002, with actual browser operations, Estonian captions and clearly identified TEST payments. Generated MP4/WebM files stay local under recordings/.
+
 ## Develop and verify
 
 The portal follows the supplied CVI: warm backgrounds, forest green navigation, clay map markers, local Lora/Work Sans fonts and dot participation indicators. Public service, process and supplier links explain the existing pilot flow. [Visual identity](docs/Features/VisualIdentity.md) records the design requirements and [font inventory](public/fonts/README.md) records bundled assets and licenses.
