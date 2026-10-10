@@ -174,7 +174,13 @@ export async function createCommitment(
     );
     assert(
       p.frozen_snapshot ||
-        offer.deposit_cents >= calculatePlatformFee(offer.tiers[0].priceCents, CURRENT_FEE_POLICY),
+        offer.deposit_cents >=
+          calculatePlatformFee(
+            CURRENT_FEE_POLICY.version === 'contract-price-v1'
+              ? offer.tiers[0].priceCents
+              : offer.deposit_cents,
+            CURRENT_FEE_POLICY,
+          ),
       409,
       'DEPOSIT_FEE_COVERAGE',
       'Valitud pakkumise tagatisraha ei kata portaali teenustasu. Pakkuja peab enne liitumist pakkumist uuendama.',

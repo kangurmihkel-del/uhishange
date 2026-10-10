@@ -121,11 +121,11 @@ test('buyer, supplier and neighboring buyers reach a lower tier through the port
   const feeRows = feePreview.getByTestId('service-fee-row');
   await expect(feeRows).toHaveCount(2);
   await expect(feeRows.nth(0)).toContainText(/900\s*€/);
-  await expect(feeRows.nth(0)).toContainText(/36\s*€/);
-  await expect(feeRows.nth(0)).toContainText(/64,03\s*€/);
+  await expect(feeRows.nth(0)).toContainText(/10\s*€/);
+  await expect(feeRows.nth(0)).toContainText(/90,03\s*€/);
   await expect(feeRows.nth(1)).toContainText(/700\s*€/);
-  await expect(feeRows.nth(1)).toContainText(/28\s*€/);
-  await expect(feeRows.nth(1)).toContainText(/72,03\s*€/);
+  await expect(feeRows.nth(1)).toContainText(/10\s*€/);
+  await expect(feeRows.nth(1)).toContainText(/90,03\s*€/);
   await page.getByLabel('Hooaja hind (€) 2', { exact: true }).fill('190,00');
   await expect(feeRows.nth(1)).toContainText(/190\s*€/);
   await expect(feeRows.nth(1)).toContainText(/10\s*€/);
@@ -136,24 +136,11 @@ test('buyer, supplier and neighboring buyers reach a lower tier through the port
   });
   await page.getByLabel('Hooaja hind (€) 2', { exact: true }).fill('700,00');
   await page.getByLabel('Tagatisraha (€)', { exact: true }).fill('35,00');
-  const rejectedOffer = page.waitForResponse(
-    (response) =>
-      response.request().method() === 'POST' &&
-      new URL(response.url()).pathname === '/api/v1/procurements/' + id + '/offers',
-  );
-  await page.getByRole('button', { name: 'Saada pakkumine', exact: true }).click();
-  const rejection = await rejectedOffer;
-  expect(rejection.status()).toBe(400);
-  const rejectedBody = await rejection.json();
-  expect(rejectedBody.error.code).toBe('VALIDATION_ERROR');
-  expect(rejectedBody.error.message).toContain('Tagatisraha peab katma esimese hinnataseme');
-  expect(rejectedBody.error.message).toMatch(/36,00\s*€/);
-  await expect(
-    page.getByRole('alert').filter({ hasText: 'Kontrolli sisestatud andmeid ja proovi uuesti.' }),
-  ).toBeVisible();
-  await expect(page.getByTestId('deposit-coverage-note')).toContainText(/vähemalt 36\s*€/);
-  expect((await api<ProcurementDetail>(page.request, '/procurements/' + id)).offers).toHaveLength(
-    0,
+  await expect(feeRows.nth(0)).toContainText(/3,50\s*€/);
+  await expect(feeRows.nth(0)).toContainText(/31,50\s*€/);
+  await expect(feeRows.nth(1)).toContainText(/3,50\s*€/);
+  await expect(page.getByTestId('deposit-coverage-note')).toContainText(
+    'Teenustasu ei sõltu teenuse lõpphinnast ega hinnatasemest.',
   );
   await page.getByLabel('Tagatisraha (€)', { exact: true }).fill('100,03');
   await page.getByRole('button', { name: 'Saada pakkumine', exact: true }).click();
@@ -252,7 +239,7 @@ test('buyer, supplier and neighboring buyers reach a lower tier through the port
       await expect(history.locator('pre')).toHaveCount(0);
       const accepted = await api<ProcurementDetail>(page.request, '/procurements/' + id);
       expect(accepted.commitments[0].acceptanceSnapshot).toMatchObject({
-        feePolicy: { version: 'contract-price-v1', basisPoints: 400, minimumCents: 1000 },
+        feePolicy: { version: 'deposit-v1', basisPoints: 1000, minimumCents: 0 },
       });
       await expectResponsive(page);
       await page.getByText('Liitumisel kinnitatud tingimused', { exact: true }).click();
@@ -486,9 +473,9 @@ test('individual contracts expose final prices, accept ratings and retain cancel
   const fixture = await finalizedFixture(request, pestSpec);
   expect(fixture.contract.finalSnapshot.spec).toEqual(pestSpec);
   expect(fixture.contract.finalSnapshot).toMatchObject({
-    feePolicy: { version: 'contract-price-v1', basisPoints: 400, minimumCents: 1000 },
-    serviceFeeCents: 3600,
-    supplierPayoutCents: 6403,
+    feePolicy: { version: 'deposit-v1', basisPoints: 1000, minimumCents: 0 },
+    serviceFeeCents: 1000,
+    supplierPayoutCents: 9003,
   });
   await login(page);
   await navigate(page, /^Postkast/);
@@ -541,8 +528,8 @@ test('individual contracts expose final prices, accept ratings and retain cancel
   await expect(history).toContainText('Lukustatud söödakastid; laste ja lemmikloomade ohutus.');
   await expect(history).not.toContainText('Koristusala');
   await expect(history).toContainText('TESTMAKSE · Tegelikku raha ei liigu.');
-  await expect(history.getByTestId('contract-service-fee')).toContainText(/36\s*€/);
-  await expect(history.getByTestId('supplier-deposit-payout')).toContainText(/64,03\s*€/);
+  await expect(history.getByTestId('contract-service-fee')).toContainText(/10\s*€/);
+  await expect(history.getByTestId('supplier-deposit-payout')).toContainText(/90,03\s*€/);
   await expect(history.locator('pre')).toHaveCount(0);
   const frozenBuyer = fixture.contract.finalSnapshot.buyerOrganization;
   const liveSession = await api<SessionResponse>(request, '/session');
@@ -623,8 +610,8 @@ test('individual contracts expose final prices, accept ratings and retain cancel
   await cancelled.getByText('Lepingu lõplik tingimuste koopia', { exact: true }).click();
   await expect(cancelled.getByTestId('agreement-history')).toContainText(frozenBuyer.address);
   await expect(cancelled.getByTestId('agreement-history')).toContainText('Lõplik teenuse hind');
-  await expect(cancelled.getByTestId('contract-service-fee')).toContainText(/36\s*€/);
-  await expect(cancelled.getByTestId('supplier-deposit-payout')).toContainText(/64,03\s*€/);
+  await expect(cancelled.getByTestId('contract-service-fee')).toContainText(/10\s*€/);
+  await expect(cancelled.getByTestId('supplier-deposit-payout')).toContainText(/90,03\s*€/);
   await expectResponsive(page);
   await expect(
     cancelled.getByRole('button', { name: 'Lõpeta teenus ja hinda', exact: true }),

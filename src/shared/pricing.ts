@@ -2,9 +2,9 @@ import type { AgreementSnapshot, FeePolicy } from './types.js';
 import { PLATFORM_FEE_BASIS_POINTS } from './constants.js';
 
 export const CURRENT_FEE_POLICY: Readonly<FeePolicy> = Object.freeze({
-  version: 'contract-price-v1',
+  version: 'deposit-v1',
   basisPoints: PLATFORM_FEE_BASIS_POINTS,
-  minimumCents: 1000,
+  minimumCents: 0,
 });
 
 /** Gross fee, rounded half-up per association; no additional VAT is added. */

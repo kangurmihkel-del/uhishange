@@ -12,16 +12,11 @@ export function feePolicyText(policy: FeePolicy) {
 export default function FeeTerms({ policy }: { policy: FeePolicy }) {
   return (
     <p className="fee-terms">
-      <strong>
-        {policy.version === 'deposit-v1'
-          ? 'Salvestatud varasem teenustasu'
-          : 'Teenusepakkuja teenustasu'}
-        :
-      </strong>{' '}
-      {feePolicyText(policy)}. Tasu arvestatakse testtagatisest. Ühistule lisatasu ei lisandu; kogu
-      tagatis vähendab teenuse tasu.
-      {policy.version === 'contract-price-v1' &&
-        ' Teenustasu sisaldab käibemaksu, kui see kohaldub.'}
+      <strong>Teenusepakkuja teenustasu:</strong> {feePolicyText(policy)}. Tasu arvestatakse
+      testtagatisest. Ühistule lisatasu ei lisandu; kogu tagatis vähendab teenuse tasu. Teenustasu
+      sisaldab käibemaksu, kui see kohaldub.
+      {policy.version === 'deposit-v1' &&
+        ' Teenustasu ei sõltu teenuse lõpphinnast ega töö mahust.'}
     </p>
   );
 }
@@ -54,7 +49,12 @@ export function SupplierFeePreview({
       aria-live={live ? 'polite' : undefined}
     >
       <h4>Teenusepakkuja arvestus ühe ühistu kohta</h4>
-      <p>TESTARVESTUS · Lõplik tasu selgub saavutatud hinnatasemest.</p>
+      <p>
+        TESTARVESTUS ·{' '}
+        {policy.version === 'contract-price-v1'
+          ? 'Lõplik tasu selgub saavutatud hinnatasemest.'
+          : 'Teenustasu sõltub ainult tagatisest, mitte teenuse lõpphinnast ega töö mahust.'}
+      </p>
       <div className="fee-preview-rows">
         {tiers.map((tier, index) => {
           const { fee, payout } = feeAmounts(tier.priceCents, depositCents ?? 0, policy);
@@ -70,7 +70,11 @@ export function SupplierFeePreview({
               </div>
               <div>
                 <dt>Portaali teenustasu</dt>
-                <dd>{euro(fee)}</dd>
+                <dd>
+                  {depositCents === undefined && policy.version === 'deposit-v1'
+                    ? 'Sisesta tagatis'
+                    : euro(fee)}
+                </dd>
               </div>
               <div>
                 <dt>Teenusepakkujale tagatisest</dt>

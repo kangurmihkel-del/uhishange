@@ -2,9 +2,9 @@
 
 Owner: project maintainer. Verified on 2026-10-10 in Europe/Tallinn.
 
-The functional local pilot is running at http://localhost:3000. All required local build, test and analysis gates passed. Docker-backed verification is complete.
+The functional local pilot is running at http://localhost:3000. The full-suite baseline below predates the quick deposit-fee revision. The latest revision uses the limited checks recorded at the end of this document, as requested by the maintainer; no new full-suite or coverage claim is made for it.
 
-## Recorded commands
+## Recorded full-suite baseline commands
 
 | Command                          | Result                                                                                       |
 | -------------------------------- | -------------------------------------------------------------------------------------------- |
@@ -22,7 +22,7 @@ The initial sandbox helper could not execute commands. Approved host execution p
 
 ## Coverage
 
-Final Vitest V8 coverage from the passing suite:
+Vitest V8 coverage from the last passing full suite, before the quick deposit-fee revision:
 
 | Scope                                                         | Statements | Branches | Functions | Lines   |
 | ------------------------------------------------------------- | ---------- | -------- | --------- | ------- |
@@ -155,3 +155,13 @@ Docker Compose rebuilt the production app/worker with persistent storage preserv
 The [pricing notebook](../Business/pricing-scenarios.ipynb) executed all six code cells without errors. Its calculation assertions passed and the rendered tables were visually inspected. Cost budgets and participation volumes are explicit scenarios rather than observed operating results. The previously delivered recording remains evidence of the historical deposit-only tariff; the reproducible recorder now expects €84 in fees and €216 in supplier allocations for three €700 contracts with €100 deposits.
 
 The maintainer merged two additional source documents while this change was being published. The pull-request merge check initially reported a formatting difference in the supplied standalone HTML. Both source files were integrated unchanged; the HTML is now explicitly excluded from automatic formatting, following the existing source-form preservation rule. Canonical analysis passes with the combined tree.
+
+## Quick deposit-fee revision: limited verification
+
+The maintainer requested a quick change without rerunning everything. [ADR 0006](../ADR/0006-deposit-service-fee.md) now freezes a 10% deposit fee with no minimum for new acceptances. Existing deposit-rate and contract-price policies remain authoritative. Browser expectations and the reproducible recorder were updated to the current terms; no new recording or screenshot set was generated.
+
+The focused command `npx vitest run tests/integration/pricing.test.ts tests/integration/portal.test.ts --coverage.enabled=false --testNamePattern "versioned gross service fees|versioned service-fee acceptance and finalization|recovers due finalization|preserves a non-snow acceptance"` passed 10 tests against real PostgreSQL/PostGIS, with 18 unrelated cases skipped. Checks cover deposit-only pricing across lower tiers, no minimum, exact rounding, malformed amounts and the cheapest-price deposit cap, frozen historical/custom policies, full deposit credit, retained withdrawals, repeated finalization and exact cancellation reversals. Coverage was disabled so the full-suite baseline above remains intact.
+
+The pricing notebook executed seven arithmetic cells with all assertions passing. Its current EUR 100 deposit scenario verifies EUR 10 gross fee and EUR 90 supplier allocation, independent of the service price. Earlier comparisons are explicitly historical. The complete application suite, browser suite, production screenshot collection and full hosted CI are intentionally not rerun for this revision. The publication commit skips automatic full CI to follow that request; this is a limited verification result, not a new full-suite acceptance claim.
+
+Canonical build, format and static analysis passed. `docker compose up --build -d app worker` rebuilt the demo without resetting storage; app/database are healthy, initialization exited with code 0 and the worker runs. The deployed pricing module reports `deposit-v1`, 1000 basis points and zero minimum, with a 1000-cent fee on a 10000-cent deposit. HTTP health reports database ready and TEST payments. Before/after whole-table fingerprints match for all four commitments, zero contracts, three ledger rows and 35 audit entries.

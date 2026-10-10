@@ -1,12 +1,18 @@
 # Deposit-fee sustainability review
 
-Reviewed: 2026-10-10. Decision owner: project maintainer. The initial review below assesses the original deposit-only fee. During the review the maintainer instructed “pane mõistlik teenustasu”; [ADR 0005](../ADR/0005-contract-service-fee.md) records the resulting accepted tariff. All transactions remain TEST transactions and produce no actual revenue.
+Reviewed: 2026-10-10. Decision owner: project maintainer. The initial review below assesses the original deposit-only fee. The latest decision is [ADR 0006](../ADR/0006-deposit-service-fee.md): 10% of the deposit, with no minimum. It supersedes ADR 0005 for newly accepted agreements because final service prices can be uncertain or depend on area. All transactions remain TEST transactions and produce no actual revenue.
 
 ## Accepted tariff after review
 
-For new agreements, charge the supplier 4% of the final gross contract price, minimum EUR 10 per association contract. This supersedes the deposit-only model below for newly frozen terms. Existing accepted terms retain their stored pricing. The minimum was chosen at EUR 10 rather than EUR 20 to keep current smaller demo services reasonably close to the intended percentage: a EUR 190 contract pays EUR 10 (5.26%) rather than EUR 20 (10.53%). This is a product decision, not measured price willingness.
+For new agreements, charge the supplier 10% of each retained gross deposit, with no minimum. EUR 100 produces a EUR 10 fee and EUR 90 supplier deposit payout regardless of the final service price or participant tier. The buyer credits the whole deposit. Previous frozen agreements retain their stored percentage, fee base and minimum.
 
-With a EUR 700 contract and EUR 100 deposit, the fee is EUR 28, versus the previous EUR 4. The supplier receives EUR 72 from the deposit and EUR 600 by direct invoice; the buyer still pays EUR 700 in total. At the same disclosed standard-card/VAT-inclusive assumptions, EUR 28 / 1.24 rounded to EUR 22.58 less EUR 1.75 processing leaves EUR 20.83 for operating costs. An assumed EUR 300/month budget then requires 173 retained contracts annually, before refunds, payout fees, variable support and acquisition. This improvement does not by itself prove profitability. Fee policy, deposit coverage and withdrawal handling are specified in ADR 0005.
+Under the same disclosed standard-card/VAT-inclusive scenario, EUR 10 / 1.24 rounded to EUR 8.06 less EUR 1.75 processing leaves EUR 6.31 for operating costs. The assumed EUR 300/month budget needs 571 retained EUR 100 participations annually before refunds, payout costs, support and acquisition. This is a scenario, not proven profitability or customer willingness.
+
+### Historical contract-price decision
+
+ADR 0005 previously chose 4% of the final gross contract price with a EUR 10 minimum. That policy remains authoritative only for agreements already frozen under it; the latest decision no longer bases fees on service value.
+
+With a EUR 700 contract and EUR 100 deposit, that historical tariff charged EUR 28. The supplier received EUR 72 from the deposit and EUR 600 by direct invoice; the buyer still paid EUR 700 in total. At the same assumptions it contributed EUR 20.83 and required 173 retained contracts annually for an assumed EUR 300/month budget. The maintainer rejected using this uncertain final service price as the current fee base.
 
 ## Finding
 
@@ -16,10 +22,10 @@ The original [business analysis](../Uhishange_arianaluus_2026-10-09.docx), secti
 
 ## Deposit-only baseline implementation evidence
 
-- [constants.ts](../../src/shared/constants.ts): 400 fee basis points.
+- The original [constants.ts](../../src/shared/constants.ts) used 400 fee basis points; the current deposit policy uses 1000.
 - Before the upgrade, [domain.ts](../../src/server/domain.ts) rounded each retained deposit fee to the nearest cent at successful deadline finalization; the supplier received the remainder. The buyer's full deposit credit and remaining invoice outside the portal continue unchanged.
 - Unsuccessful groups and pre-success withdrawals earn no fee. Supplier cancellation reverses previously allocated fees. Post-success retained withdrawals can generate fees despite having no continuing contract; therefore contract count alone does not fully reconcile fee revenue.
-- Before the upgrade, [validation.ts](../../src/server/validation.ts) allowed any positive deposit up to the cheapest tier price, with no minimum fee, minimum commercial deposit or deposit-to-service-value ratio. EUR 1 yielded EUR 0.04; 1–12 cents yielded no fee after rounding. New offers instead require coverage of the contract fee, including the EUR 10 minimum.
+- The original [validation.ts](../../src/server/validation.ts) allowed any positive deposit up to the cheapest tier price. EUR 1 yielded EUR 0.04; 1–12 cents yielded no fee after rounding. ADR 0005 added coverage of the contract fee/minimum. Current deposit-based offers again require a positive deposit no greater than the cheapest price, without a contract-price coverage minimum.
 - The recorded workflow has EUR 2,100 of service contracts, EUR 300 of deposits and EUR 12 of TEST fees: an effective gross fee of 0.571% of service value.
 
 ## Cost assumptions and sources
@@ -36,7 +42,7 @@ Prices were checked on 2026-10-10 using provider and tax-authority pages. No pro
 
 Use EUR 50/month as an illustrative technical operating budget. Use EUR 300/month as a modest total budget: EUR 50 technical services, four hours of maintenance/support at an assumed EUR 50/hour, and EUR 50 administration/reserve. These are explicit planning choices, not quotes; variable support, development recovery, acquisition, disputes, supplier onboarding and PSP payout costs remain excluded. Startup costs and profit are excluded. Avoid counting the same work both as fixed time and per-participation support.
 
-## Per-participation economics
+## Original 4% per-participation economics
 
 One participation means one association's retained captured deposit in one procurement, not one unique association or one entire group procurement. The base scenario assumes the portal bears capture costs, standard EEA cards, no refunds, and no additional payout/support costs.
 
@@ -49,7 +55,7 @@ One participation means one association's retained captured deposit in one procu
 
 Contribution is available for fixed costs; it is not net profit. Fee and assumed provider costs are rounded to cents per participation. VAT-exclusive fee revenue is rounded to cents per participation in the alternate scenario; invoice aggregation may cause small rounding differences.
 
-## Annual break-even
+## Original 4% annual break-even
 
 Divide twelve months of fixed costs by per-participation contribution and round **up**. Snow procurement revenue may arrive once per year while operating expenses continue year-round; a monthly average is not steady monthly cash flow.
 
@@ -66,7 +72,7 @@ Refunds lower this further. If 20% of captures are ultimately refunded/cancelled
 
 ## Initial recommendation and accepted follow-up
 
-The initial recommendation was to test a supplier success fee on **final service contract value**, with a minimum and explicit VAT/PSP policy. The maintainer subsequently authorized implementing a reasonable service fee. The accepted policy is 4% of final gross contract value with a EUR 10 minimum, as explained above and in ADR 0005. A subscription or sponsoring partner remains an alternative/additional way to fund fixed operating costs.
+The initial recommendation led to ADR 0005's contract-price tariff. The maintainer then explained that final price can be uncertain or depend on square metres and requested a larger deposit-based fee instead. ADR 0006 now chooses 10% of the retained deposit, without a minimum. A subscription or sponsoring partner remains an alternative/additional way to fund fixed operating costs.
 
 The supplier's deposit should be selected for commitment/risk management rather than used as the sole revenue lever. Obtain the maintainer's expected annual participations, average contract/deposit, refund rate, payment mix, support minutes and real operating budget before setting final prices. Higher deposits alone could reduce joining and are not a demonstrated solution.
 
@@ -80,4 +86,4 @@ The new implementation defines fee basis, VAT, payer, minimum, timing, forfeitur
 python -m jupyter nbconvert --execute --to notebook --inplace docs/Business/pricing-scenarios.ipynb
 ```
 
-The notebook uses local, disclosed scenario inputs and no live business data. Tables are sufficient for this small exact-value comparison; no synthetic performance series or measured usage claims are introduced. The notebook itself does not change application data or payments. The separately authorized application update implements ADR 0005.
+The notebook retains the historical comparisons and includes the current 10% deposit scenario. It uses local, disclosed inputs and no live business data. Tables are sufficient for this small exact-value comparison; no synthetic performance series or measured usage claims are introduced. It changes no application data or payments. The current application implements ADR 0006 while preserving already frozen terms.

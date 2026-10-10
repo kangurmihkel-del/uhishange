@@ -89,7 +89,7 @@ import Mailbox from './Mailbox';
 import ProcurementFlow, { type FlowTarget } from './ProcurementFlow';
 import Brand, { BrandMark, CommunityHouses } from './Brand';
 import ParticipantProgress from './ParticipantProgress';
-import { CURRENT_FEE_POLICY, calculatePlatformFee, feePolicyForSnapshot } from '../shared/pricing';
+import { CURRENT_FEE_POLICY, feePolicyForSnapshot } from '../shared/pricing';
 import FeeTerms, { SupplierFeePreview, feeAmounts, feePolicyText } from './FeeTerms';
 
 const serviceId = (spec: ProcurementSpec) => ('formId' in spec ? spec.formId : 'snow');
@@ -2061,12 +2061,6 @@ function OfferForm({
     }
     return [{ priceCents, minParticipants }];
   });
-  const minimumDeposit = previewTiers.length
-    ? calculatePlatformFee(
-        Math.max(...previewTiers.map((tier) => tier.priceCents)),
-        CURRENT_FEE_POLICY,
-      )
-    : CURRENT_FEE_POLICY.minimumCents;
   const cheapestPrice = previewTiers.length
     ? Math.min(...previewTiers.map((tier) => tier.priceCents))
     : undefined;
@@ -2108,7 +2102,7 @@ function OfferForm({
             <span>
               Hinnad on ühe ühistu {isSnowService(procurement.spec) ? 'hooaja' : 'kogu teenuse'}{' '}
               brutohinnad. Osalejate arv peab kasvama ja hinnad saavad ainult langeda. Tagatis ei
-              või ületada odavaimat hinnataset ja peab katma suurima hinnataseme teenustasu.
+              või ületada odavaimat hinnataset. Teenustasu arvestatakse tagatisest.
             </span>
           </div>
           <div className="field-grid">
@@ -2127,7 +2121,7 @@ function OfferForm({
             </Field>
             <Field
               label="Tagatisraha (€)"
-              hint={`Vähemalt ${euro(minimumDeposit)} teenustasu katmiseks.`}
+              hint={`${etNumber(CURRENT_FEE_POLICY.basisPoints / 100)}% tagatisest on portaali teenustasu.`}
             >
               <RegionalNumberInput
                 name="deposit"
@@ -2155,7 +2149,7 @@ function OfferForm({
           </div>
           <FeeTerms policy={CURRENT_FEE_POLICY} />
           <p className="deposit-coverage-note" data-testid="deposit-coverage-note">
-            Tagatis peab katma suurima hinnataseme teenustasu: vähemalt {euro(minimumDeposit)}.
+            Teenustasu ei sõltu teenuse lõpphinnast ega hinnatasemest.
             {cheapestPrice !== undefined && ` Tagatis võib olla kuni ${euro(cheapestPrice)}.`}
           </p>
           <SupplierFeePreview

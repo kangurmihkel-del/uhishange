@@ -121,9 +121,11 @@ export const offerSchema = z
   .strict()
   .superRefine((offer, ctx) => {
     // Zod can collect range/array-size issues and still run this refinement.
-    // Leave malformed tier prices to their field validators before fee arithmetic.
+    // Leave malformed amounts to their field validators before fee arithmetic.
     if (
       !offer.tiers.length ||
+      !Number.isSafeInteger(offer.depositCents) ||
+      offer.depositCents <= 0 ||
       offer.tiers.some((tier) => !Number.isSafeInteger(tier.priceCents) || tier.priceCents <= 0)
     )
       return;
@@ -140,12 +142,17 @@ export const offerSchema = z
         });
     if (offer.depositCents > offer.tiers.at(-1)!.priceCents)
       ctx.addIssue({ code: 'custom', message: 'Tagatisraha ei tohi ületada soodsaimat hinda.' });
-    const maximumFee = calculatePlatformFee(offer.tiers[0].priceCents, CURRENT_FEE_POLICY);
+    const maximumFee = calculatePlatformFee(
+      CURRENT_FEE_POLICY.version === 'contract-price-v1'
+        ? offer.tiers[0].priceCents
+        : offer.depositCents,
+      CURRENT_FEE_POLICY,
+    );
     if (offer.depositCents < maximumFee)
       ctx.addIssue({
         code: 'custom',
         path: ['depositCents'],
-        message: `Tagatisraha peab katma esimese hinnataseme portaali teenustasu (${new Intl.NumberFormat('et-EE', { style: 'currency', currency: 'EUR' }).format(maximumFee / 100)}).`,
+        message: `Tagatisraha peab katma portaali teenustasu (${new Intl.NumberFormat('et-EE', { style: 'currency', currency: 'EUR' }).format(maximumFee / 100)}).`,
       });
   });
 export const selectOfferSchema = z.object({ offerId: uuidSchema }).strict();

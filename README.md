@@ -42,7 +42,7 @@ The demo supports the five types from [Uhishange_vorm.html](Uhishange_vorm.html)
 3. Sign in as the supplier and publish an offer with participant/price tiers and a fixed deposit.
 4. As the initiator, select one offer. Each buyer confirms authority and scope, then captures their test deposit.
 5. Reach the first tier to confirm success. Additional paid buyers can improve everyone's price until the joining deadline.
-6. At the deadline, the worker finalizes individual contracts. For new agreements, the supplier pays 4% of each final gross contract price, minimum EUR 10, deducted from the deposit. The remainder goes to the supplier; the buyer credits the full deposit. Buyers confirm completion and leave ratings. Previously accepted agreements retain their stored deposit-fee terms.
+6. At the deadline, the worker finalizes individual contracts. For new agreements, the supplier pays 10% of the deposit, with no minimum and independent of the final service price. The remaining 90% goes to the supplier; the buyer credits the full deposit. Buyers confirm completion and leave ratings. Previously accepted agreements retain their stored fee terms.
 7. Inspect immutable events, ledger entries, imports and approvals as administrator.
 
 The procurement page shows the five stages and a role-specific next action above its details. Buttons open the actual offer, neighbor or joining form. The mailbox stores invitations and offer/payment/deadline notifications; each user's read status survives logout and restart. All financial letters explicitly identify TEST transactions.

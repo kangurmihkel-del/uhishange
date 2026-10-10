@@ -2,6 +2,8 @@
 
 Status: accepted by maintainer instruction on 2026-10-10 (“pane mõistlik teenustasu”). This decision supersedes the original pilot's deposit-only fee for agreements first accepted after this update. It does not reprice accepted history.
 
+Superseded for future acceptances by [ADR 0006](0006-deposit-service-fee.md). The decision below remains the historical authority for agreements frozen under this policy.
+
 ## Decision
 
 New agreements charge the supplier 4% of each continuing association's final gross contract value, with a EUR 10 minimum per contract. The fee is a final gross amount; VAT, if applicable, is included rather than added on top. The buyer pays the accepted gross service price and credits the full gross deposit, with no added platform charge.
