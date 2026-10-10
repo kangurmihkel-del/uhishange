@@ -35,7 +35,7 @@ Owner: project maintainer. Base path: /api/v1. JSON requests and responses use c
 | GET /contracts                      | Own buyer/supplier contracts                                                             | Approved membership or administrator  |
 | POST /contracts/:id/complete        | rating 1–5, comment                                                                      | Owning buyer representative           |
 
-Snow specification: seasonStart, seasonEnd, areaM2, parkingM2, walkwayM, triggerCm, responseHours, gritting, snowHauling. Price tiers use minParticipants and priceCents; first tier is the success threshold. Dates and validity must cover the joining period. Deposits must not exceed the cheapest possible price. Accepting terms cannot bypass the server-side authority check.
+New specification: {formId,version:1,answers}, with formId snow, pest, energy, branches or other. Shared versioned field definitions validate required values, choices, bounds, dates and visible conditional answers on the server. Unknown or hidden fields and unsupported versions are rejected. Legacy snow specification remains accepted: seasonStart, seasonEnd, areaM2, parkingM2, walkwayM, triggerCm, responseHours, gritting, snowHauling. Every supplier supplies one gross total for the complete service per association, including when the request prefers unit prices. Price tiers use minParticipants and priceCents; first tier is the success threshold. Dates and validity must cover the joining period. Deposits must not exceed the cheapest possible price. Accepting terms cannot bypass the server-side authority check.
 
 ## Mailbox
 

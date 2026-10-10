@@ -1,6 +1,8 @@
 import type { ReactNode } from 'react';
 import type { AcceptanceSnapshot, FinalContractSnapshot, Organization } from '../shared/types';
 import { date, euro } from './api';
+import { isSnowService, serviceLabel } from '../shared/serviceForms';
+import ServiceScope from './ServiceScope';
 
 type Snapshot = AcceptanceSnapshot | FinalContractSnapshot;
 const number = (value: number) => new Intl.NumberFormat('et-EE').format(value);
@@ -27,6 +29,7 @@ function Party({ label, organization }: { label: string; organization: Organizat
 export default function AgreementHistory({ snapshot }: { snapshot: Snapshot }) {
   const final = 'finalizedAt' in snapshot;
   const spec = snapshot.spec;
+  const snow = isSnowService(spec);
   return (
     <section
       className="agreement-history"
@@ -51,25 +54,22 @@ export default function AgreementHistory({ snapshot }: { snapshot: Snapshot }) {
         <Party label="Hanke algataja" organization={snapshot.initiatorOrganization} />
       </div>
       <h5>Teenuse ulatus</h5>
-      <dl className="agreement-facts">
-        <Fact label="Hooaeg">
-          {date(spec.seasonStart)} – {date(spec.seasonEnd)}
-        </Fact>
-        <Fact label="Koristusala">{number(spec.areaM2)} m²</Fact>
-        <Fact label="Parkimisala">{number(spec.parkingM2)} m²</Fact>
-        <Fact label="Kõnnitee">{number(spec.walkwayM)} m</Fact>
-        <Fact label="Koristuse algus">Lumekiht alates {number(spec.triggerCm)} cm</Fact>
-        <Fact label="Reageerimisaeg">Kuni {number(spec.responseHours)} tundi</Fact>
-        <Fact label="Libedusetõrje">{spec.gritting ? 'Sisaldub' : 'Ei sisaldu'}</Fact>
-        <Fact label="Lume äravedu">{spec.snowHauling ? 'Sisaldub' : 'Ei sisaldu'}</Fact>
-      </dl>
+      <p className="agreement-form-label">
+        {serviceLabel(spec)}
+        {'formId' in spec ? ` · vormi versioon ${spec.version}` : ' · varasem lumekoristuse vorm'}
+      </p>
+      <ServiceScope spec={spec} className="agreement-facts" />
       <h5>Hinnad ühe ühistu kohta</h5>
       <dl className="agreement-facts">
-        <Fact label="Hooaja tavahind">{euro(snapshot.basePriceCents)}</Fact>
+        <Fact label={snow ? 'Hooaja tavahind' : 'Teenuse tavahind'}>
+          {euro(snapshot.basePriceCents)}
+        </Fact>
         <Fact label="Testtagatis">{euro(snapshot.depositCents)}</Fact>
         {final && (
           <>
-            <Fact label="Lõplik hooaja hind">{euro(snapshot.finalPriceCents)}</Fact>
+            <Fact label={snow ? 'Lõplik hooaja hind' : 'Lõplik teenuse hind'}>
+              {euro(snapshot.finalPriceCents)}
+            </Fact>
             <Fact label="Hinna sisse arvestatud testtagatis">
               {euro(snapshot.depositCreditCents)}
             </Fact>

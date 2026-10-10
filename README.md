@@ -4,7 +4,7 @@
 
 [Public source repository](https://github.com/viljarpuusepp/uhishange)
 
-A functional local pilot for housing associations procuring seasonal snow removal together in Mustamäe. The Estonian portal includes buyer, supplier and administrator workflows backed by PostgreSQL/PostGIS. All payments and payouts are simulated; invitations stay inside the portal.
+A functional local pilot for housing associations procuring shared services in Mustamäe. The Estonian portal includes buyer, supplier and administrator workflows backed by PostgreSQL/PostGIS. All payments and payouts are simulated; invitations stay inside the portal.
 
 ## Start
 
@@ -26,14 +26,18 @@ Every demo account uses password **Demo2026!**.
 | ----------------------------------------- | -------------------------------- |
 | buyer1@demo.test                          | Initiating housing association   |
 | buyer2@demo.test through buyer8@demo.test | Neighboring housing associations |
-| supplier@demo.test                        | Snow-removal supplier            |
+| supplier@demo.test                        | Demo service supplier            |
 | admin@demo.test                           | Platform administrator           |
 
-Demo organizations, coordinates, contracts and money are test material. Local registration creates a user; organization authority requires approval in the administrator screen. Invites never grant permissions.
+Demo organizations, service requests, coordinates, contracts and money are test material. Local registration creates a user; organization authority requires approval in the administrator screen. Invites never grant permissions.
+
+## Procurement types
+
+The demo supports the five types from [Uhishange_vorm.html](Uhishange_vorm.html): snow removal, pest control, energy certificates, branch cleanup and a free-form service. Each type has its own questions and shared location/access/date/pricing fields. Conditional questions appear when relevant. Four new fictional requests demonstrate the added categories; an ordinary startup upgrades existing demo databases idempotently. Existing snow requests and historical agreements remain supported. Supplier prices always cover the complete described service per association.
 
 ## Try the complete workflow
 
-1. Use **Ostja** (buyer1) to create a seasonal procurement. Follow the visible **next action**: publish, open the neighbor map and send in-app invitations.
+1. Use **Ostja** (buyer1) to select a procurement type and create a request. Follow the visible **next action**: publish, open the neighbor map and send in-app invitations.
 2. Use **Naaberühistu** (buyer2), open **Postkast**, read the invitation and accept it. Follow **Vaata hanget** to see the shared process. Invitation acceptance is separate from paid participation.
 3. Sign in as the supplier and publish an offer with participant/price tiers and a fixed deposit.
 4. As the initiator, select one offer. Each buyer confirms authority and scope, then captures their test deposit.
@@ -48,6 +52,8 @@ Acceptance details and final contracts show the saved agreement in Estonian, inc
 Before success, withdrawal refunds the deposit. After success, withdrawal retains it. Failed groups and supplier cancellation refund all deposits. Cancellation after payout creates reversing entries without deleting history. Remaining service balances are billed directly outside this pilot.
 
 ## Develop and verify
+
+The portal follows the supplied CVI: warm backgrounds, forest green navigation, clay map markers, local Lora/Work Sans fonts and dot participation indicators. Public service, process and supplier links explain the existing pilot flow. [Visual identity](docs/Features/VisualIdentity.md) records the design requirements and [font inventory](public/fonts/README.md) records bundled assets and licenses.
 
 Install Node 24, start the database, then install dependencies:
 
@@ -82,6 +88,6 @@ Use the administrator CSV preview before confirming an atomic import. [CSV templ
 
 ## Documentation
 
-[Documentation index](docs/Home.md) links to behavior, architecture, API, verification and operations. Root AGENTS.md applies MCAF and names the user as maintainer. The four original input files are preserved unchanged in the local workspace. The public source includes both DOCX files and the process diagram; the event poster with participant names stays local. [Source inventory](docs/Sources.md) explains this distribution and records the original hashes.
+[Documentation index](docs/Home.md) links to behavior, architecture, API, verification and operations. Root AGENTS.md applies MCAF and names the user as maintainer. The four original input files and attributed MCAF guide are preserved under docs/. [Source inventory](docs/Sources.md) records their hashes and the supplied HTML catalog.
 
 [Verification results](docs/Testing/RESULTS.md) include coverage and desktop/mobile screenshots from the running Docker portal.

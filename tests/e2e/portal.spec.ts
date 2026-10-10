@@ -9,20 +9,41 @@ import {
   navigate,
   nextAction,
   registrationPassword,
+  serviceField,
   uniqueTitle,
 } from './helpers.js';
 import type {
   AdminResponse,
   Invitation,
   MailboxResponse,
+  Offer,
   ProcurementDetail,
   SessionResponse,
+  ServiceSpec,
 } from '../../src/shared/types.js';
 
 test.afterAll(async () => {
   const { pool } = await import('../../src/server/db.js');
   await pool.end();
 });
+
+async function expectPaidProgress(
+  page: import('@playwright/test').Page,
+  paidCount: number,
+  threshold: number,
+) {
+  const progress = page.getByTestId('participant-progress').getByRole('progressbar', {
+    name: 'Makstud liitumiste eesmärk',
+    exact: true,
+  });
+  await expect(progress).toHaveAttribute('aria-valuemin', '0');
+  await expect(progress).toHaveAttribute('aria-valuemax', String(threshold));
+  await expect(progress).toHaveAttribute('aria-valuenow', String(Math.min(paidCount, threshold)));
+  await expect(progress).toHaveAttribute(
+    'aria-valuetext',
+    paidCount + ' / ' + threshold + ' makstud liitumist',
+  );
+}
 
 test('buyer, supplier and neighboring buyers reach a lower tier through the portal', async ({
   page,
@@ -35,7 +56,7 @@ test('buyer, supplier and neighboring buyers reach a lower tier through the port
   await page
     .getByLabel('Kirjeldus', { exact: true })
     .fill('Parkimisala ja kõnniteede ühine talvine hooldus.');
-  await page.getByLabel('Koristusala (m²)', { exact: true }).fill('600');
+  await serviceField(page, 'Koristusala (m²)').fill('600');
   await page.getByRole('button', { name: 'Salvesta hange', exact: true }).click();
   await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
   const id = page.url().split('#procurement/')[1];
@@ -170,6 +191,7 @@ test('buyer, supplier and neighboring buyers reach a lower tier through the port
       await expect(
         page.getByRole('status').filter({ hasText: 'Ebaõnnestunud testmakse on salvestatud' }),
       ).toBeVisible();
+      await expectPaidProgress(page, 0, 2);
     }
     await expect(
       page.getByText('TESTMAKSE · Tegelikku raha ei liigu', { exact: true }).first(),
@@ -177,6 +199,7 @@ test('buyer, supplier and neighboring buyers reach a lower tier through the port
     await nextAction(page, 'Tee testmakse');
     await page.getByRole('button', { name: 'Kinnita testmakse', exact: true }).click();
     await expect(page.getByText(index + ' makstud liitumist', { exact: true })).toBeVisible();
+    await expectPaidProgress(page, index, 2);
   }
   await expect(page.getByText('Ühine eesmärk on saavutatud!', { exact: true })).toBeVisible();
   await expect(page.getByTestId('current-price')).toContainText(/700\s*€/);
@@ -184,6 +207,7 @@ test('buyer, supplier and neighboring buyers reach a lower tier through the port
   await expect(page.getByText(/Hange on õnnestunud. Loobumisel jääb/)).toBeVisible();
   await page.getByRole('button', { name: 'Kinnita loobumine', exact: true }).click();
   await expect(page.getByText('2 makstud liitumist', { exact: true })).toBeVisible();
+  await expectPaidProgress(page, 2, 2);
   await expect(page.getByTestId('current-price')).toContainText(/700\s*€/);
   await page.getByText('Liitumisel kinnitatud tingimused', { exact: true }).click();
   await expect(page.getByTestId('agreement-history')).toContainText('Liitumine kinnitatud');
@@ -198,6 +222,21 @@ test('buyer, supplier and neighboring buyers reach a lower tier through the port
   const invitation = page.getByTestId('invitation-card').filter({ hasText: title });
   await invitation.getByRole('button', { name: 'Võta kutse vastu', exact: true }).click();
   await expect(invitation).toContainText('Vastu võetud');
+  await logout(page);
+  await login(page, 'buyer2@demo.test');
+  await page.goto('/#procurement/' + id);
+  await page.getByRole('button', { name: 'Loobu hankest', exact: true }).click();
+  await page.getByRole('button', { name: 'Kinnita loobumine', exact: true }).click();
+  await expect(page.getByText('1 makstud liitumist', { exact: true })).toBeVisible();
+  await expectPaidProgress(page, 1, 2);
+  await expect(page.getByText('Ühine eesmärk on saavutatud!', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('current-price')).toContainText(/700\s*€/);
+  const belowThreshold = await api<ProcurementDetail>(page.request, '/procurements/' + id);
+  expect(belowThreshold.procurement.activeCount).toBe(1);
+  expect(belowThreshold.procurement.status).toBe('SUCCEEDED');
+  expect(belowThreshold.procurement.succeededAt).toBe(final.procurement.succeededAt);
+  expect(belowThreshold.procurement.bestPriceCents).toBe(70_000);
+  await expectResponsive(page);
 });
 
 test('registration, organization approval, atomic CSV import and job retry are usable', async ({
@@ -208,7 +247,59 @@ test('registration, organization approval, atomic CSV import and job retry are u
   const email = 'browser-' + Date.now() + '@test.local';
   const organizationName = uniqueTitle('Brauseri uus KÜ');
   await page.goto('/');
-  await page.getByRole('button', { name: 'Loo konto', exact: true }).click();
+  const publicNavigation = page.getByRole('navigation', {
+    name: 'Avalik navigatsioon',
+    exact: true,
+  });
+  await expect(publicNavigation).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible();
+  const fonts = await page.evaluate(async () => {
+    await document.fonts.ready;
+    const loaded = await Promise.all([
+      document.fonts.load('600 16px Lora', 'Ühishange Šaakal žürii'),
+      document.fonts.load('400 16px "Work Sans"', 'Ühishange Šaakal žürii'),
+    ]);
+    return {
+      faces: loaded.map((faces) => ({
+        count: faces.length,
+        loaded: faces.every((face) => face.status === 'loaded'),
+      })),
+      heading: getComputedStyle(document.querySelector('h1')!).fontFamily,
+      body: getComputedStyle(document.body).fontFamily,
+      fontRequests: performance
+        .getEntriesByType('resource')
+        .map((entry) => entry.name)
+        .filter((url) => /\.(woff2?|ttf|otf)$/.test(new URL(url).pathname)),
+      origin: location.origin,
+    };
+  });
+  expect(fonts.faces.every((family) => family.count > 0 && family.loaded)).toBe(true);
+  expect(fonts.heading).toContain('Lora');
+  expect(fonts.body).toContain('Work Sans');
+  expect(fonts.fontRequests.length).toBeGreaterThan(0);
+  expect(fonts.fontRequests.every((url) => new URL(url).origin === fonts.origin)).toBe(true);
+
+  const initialHash = new URL(page.url()).hash;
+  for (const [label, target] of [
+    ['Teenused', 'services'],
+    ['Kuidas toimib', 'how-it-works'],
+    ['Teenusepakkujale', 'for-suppliers'],
+  ]) {
+    const link = publicNavigation.getByRole('link', { name: label, exact: true });
+    await expect(link).toHaveAttribute('href', '#' + target);
+    await link.click();
+    const section = page.locator('#' + target);
+    await expect(section).toBeVisible();
+    await expect(section).toBeInViewport();
+    await expect(section).toBeFocused();
+    expect(new URL(page.url()).hash).toBe(initialHash);
+    await expectResponsive(page);
+  }
+  const start = page.getByTestId('public-start');
+  await expect(start).toHaveAccessibleName('Alusta ühishanget');
+  await start.click();
+  await expect(page.getByLabel('Nimi', { exact: true })).toBeFocused();
+  await expectResponsive(page);
   await page.getByLabel('Nimi', { exact: true }).fill('Brauseri esindaja');
   await page.getByLabel('E-post', { exact: true }).fill(email);
   await page.getByLabel('Parool', { exact: false }).fill(registrationPassword);
@@ -292,7 +383,22 @@ test('individual contracts expose final prices, accept ratings and retain cancel
   page,
   request,
 }) => {
-  const fixture = await finalizedFixture(request);
+  const pestSpec: ServiceSpec = {
+    formId: 'pest',
+    version: 1,
+    answers: {
+      pests: ['Rotid'],
+      extent: 'Prügimaja ja kelder.',
+      apartments: 60,
+      treatment: 'Regulaarne hooldus',
+      frequency: 'Kord kuus',
+      safety: 'Lukustatud söödakastid; laste ja lemmikloomade ohutus.',
+      location: 'Sõpruse pst 212, Mustamäe, Tallinn',
+      pricing: 'Fikseeritud koguhind',
+    },
+  };
+  const fixture = await finalizedFixture(request, pestSpec);
+  expect(fixture.contract.finalSnapshot.spec).toEqual(pestSpec);
   await login(page);
   await navigate(page, /^Postkast/);
   const inbox = await api<MailboxResponse>(page.request, '/mailbox');
@@ -335,9 +441,14 @@ test('individual contracts expose final prices, accept ratings and retain cancel
   await expect(contract).toContainText('799,97');
   await contract.getByText('Lepingu lõplik tingimuste koopia', { exact: true }).click();
   const history = contract.getByTestId('agreement-history');
-  await expect(history).toContainText('Lõplik hooaja hind');
+  await expect(history).toContainText('Lõplik teenuse hind');
   await expect(history).toContainText('Teenuse kirjeldus vastavalt hankele.');
-  await expect(history).toContainText('300 m²');
+  await expect(history).toContainText('Kahjuritõrje');
+  await expect(history).toContainText('Rotid');
+  await expect(history).toContainText('Regulaarne hooldus');
+  await expect(history).toContainText('Kord kuus');
+  await expect(history).toContainText('Lukustatud söödakastid; laste ja lemmikloomade ohutus.');
+  await expect(history).not.toContainText('Koristusala');
   await expect(history).toContainText('TESTMAKSE · Tegelikku raha ei liigu.');
   await expect(history.locator('pre')).toHaveCount(0);
   const frozenBuyer = fixture.contract.finalSnapshot.buyerOrganization;
@@ -387,9 +498,7 @@ test('individual contracts expose final prices, accept ratings and retain cancel
   }
   await contract.getByRole('button', { name: 'Lõpeta teenus ja hinda', exact: true }).click();
   await contract.getByLabel('Hinnang teenusele', { exact: true }).selectOption('5');
-  await contract
-    .getByLabel('Kommentaar', { exact: true })
-    .fill('Õigeaegne ja korralik lumekoristus.');
+  await contract.getByLabel('Kommentaar', { exact: true }).fill('Õigeaegne ja ohutu kahjuritõrje.');
   await contract.getByRole('button', { name: 'Salvesta hinnang', exact: true }).click();
   await expect(contract).toContainText('Teenus lõpetatud');
   await expect(contract.getByLabel('Hinnang 5 viiest', { exact: true })).toBeVisible();
@@ -414,10 +523,10 @@ test('individual contracts expose final prices, accept ratings and retain cancel
     .getByTestId('contract-card')
     .filter({ hasText: fixture.procurement.title });
   await expect(cancelled).toContainText('Tühistatud');
-  await expect(cancelled).toContainText('Õigeaegne ja korralik lumekoristus.');
+  await expect(cancelled).toContainText('Õigeaegne ja ohutu kahjuritõrje.');
   await cancelled.getByText('Lepingu lõplik tingimuste koopia', { exact: true }).click();
   await expect(cancelled.getByTestId('agreement-history')).toContainText(frozenBuyer.address);
-  await expect(cancelled.getByTestId('agreement-history')).toContainText('Lõplik hooaja hind');
+  await expect(cancelled.getByTestId('agreement-history')).toContainText('Lõplik teenuse hind');
   await expectResponsive(page);
   await expect(
     cancelled.getByRole('button', { name: 'Lõpeta teenus ja hinda', exact: true }),
@@ -503,5 +612,259 @@ test('approved viewers read mailbox invitations without response authority', asy
   await expect(
     page.getByTestId('next-action').getByRole('button', { name: 'Kinnita liitumine', exact: true }),
   ).toHaveCount(0);
+  await expectResponsive(page);
+});
+
+test('source service types use conditional questions, clear stale answers and remain discoverable', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await login(page);
+  const created: Array<{
+    id: string;
+    title: string;
+    formId: ServiceSpec['formId'];
+    label: string;
+  }> = [];
+  for (const [formId, label] of [
+    ['pest', 'Kahjuritõrje'],
+    ['energy', 'Energiamärgis'],
+    ['branches', 'Okste koristamine'],
+    ['other', 'Muu teenus – vabas vormis'],
+  ] as const) {
+    await page.goto('/#new');
+    const type = page.getByLabel('Hanketüüp', { exact: true });
+    await expect(type).toHaveValue('snow');
+    if (formId === 'pest') {
+      await page.getByRole('checkbox', { name: 'Lume äravedu', exact: true }).check();
+      await serviceField(page, 'Lume kogumise ja äraveo tingimused').fill(
+        'Vana lumevastus peab tüübi vahetamisel kaduma.',
+      );
+    }
+    await type.selectOption(formId);
+    await expect(serviceField(page, 'Koristusala (m²)')).toHaveCount(0);
+    await expect(serviceField(page, 'Lume kogumise ja äraveo tingimused')).toHaveCount(0);
+    const title = uniqueTitle('Brauseri ' + label);
+    await page.getByLabel('Hanke pealkiri', { exact: true }).fill(title);
+    await page
+      .getByLabel('Kirjeldus', { exact: true })
+      .fill('Ühise teenuse täpne kirjeldus lähikonna ühistutele.');
+    await serviceField(page, 'Tööde asukoht').fill('Sõpruse pst 212, Mustamäe, Tallinn');
+    await serviceField(page, 'Ligipääs ja eritingimused').fill('Esindaja avab värava.');
+    await serviceField(page, 'Soovitud tööde kuupäev').fill('2030-06-15');
+    await serviceField(page, 'Soovitud hinnapakkumise vorm').selectOption(
+      'Ühikuhind koos koguhinnaga',
+    );
+    if (formId === 'pest') {
+      await page.getByRole('checkbox', { name: 'Rotid', exact: true }).check();
+      await page.getByRole('checkbox', { name: 'Hiired', exact: true }).check();
+      await serviceField(page, 'Probleemi ulatus ja mõjutatud ruumid').fill('Kelder ja prügimaja.');
+      await serviceField(page, 'Korterite arv').fill('60');
+      await expect(serviceField(page, 'Hoolduse sagedus')).toHaveCount(0);
+      await serviceField(page, 'Teenuse iseloom').selectOption('Regulaarne hooldus');
+      await serviceField(page, 'Hoolduse sagedus').selectOption('Kord kuus');
+      await serviceField(page, 'Teenuse iseloom').selectOption('Ühekordne tõrje');
+      await expect(serviceField(page, 'Hoolduse sagedus')).toHaveCount(0);
+      await serviceField(page, 'Teenuse iseloom').selectOption('Regulaarne hooldus');
+      await expect(serviceField(page, 'Hoolduse sagedus')).toHaveValue('');
+      await serviceField(page, 'Hoolduse sagedus').selectOption('Kord kuus');
+      await serviceField(page, 'Ohutus ja tõrjevahendite piirangud').fill(
+        'Lukustatud söödakastid; laste ja lemmikloomade ohutus.',
+      );
+    } else if (formId === 'energy') {
+      await serviceField(page, 'Hoone liik').selectOption('Olemasolev hoone');
+      await serviceField(page, 'Köetav pind (m²)').fill('3500.5');
+      await serviceField(page, 'Energiatarbimise andmed').selectOption('Osaliselt olemas');
+      await page
+        .getByRole('checkbox', { name: 'Soovin ka energiatõhususe soovitusi', exact: true })
+        .check();
+    } else if (formId === 'branches') {
+      await serviceField(page, 'Okste hinnanguline maht (m³)').fill('5.5');
+      await page.getByRole('checkbox', { name: 'Oksad on kokku kogutud', exact: true }).check();
+      await page.getByRole('checkbox', { name: 'Vajalik on ka lõikamine', exact: true }).check();
+      await serviceField(page, 'Lõikamistööde kirjeldus').fill('Vana tingimus.');
+      await page.getByRole('checkbox', { name: 'Vajalik on ka lõikamine', exact: true }).uncheck();
+      await expect(serviceField(page, 'Lõikamistööde kirjeldus')).toHaveCount(0);
+      await page.getByRole('checkbox', { name: 'Vajalik on ka lõikamine', exact: true }).check();
+      await expect(serviceField(page, 'Lõikamistööde kirjeldus')).toHaveValue('');
+      await serviceField(page, 'Lõikamistööde kirjeldus').fill(
+        'Lõigata ainult maha langenud okste osad.',
+      );
+    } else {
+      await serviceField(page, 'Teenuse või töö nimetus').fill('Trepikodade suurpuhastus');
+      await serviceField(page, 'Tööde kirjeldus').fill(
+        'Pesta kolme trepikoja põrandad ja käsipuud.',
+      );
+      await serviceField(page, 'Töö maht või kogus').fill('3 trepikoda');
+      await page
+        .getByRole('checkbox', { name: 'Pakkuja peab objektiga kohapeal tutvuma', exact: true })
+        .check();
+    }
+    await expectResponsive(page);
+    await page.getByRole('button', { name: 'Salvesta hange', exact: true }).click();
+    await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
+    const id = page.url().split('#procurement/')[1];
+    const saved = await api<ProcurementDetail>(page.request, '/procurements/' + id);
+    const spec = saved.procurement.spec as ServiceSpec;
+    expect(spec.formId).toBe(formId);
+    expect(spec.version).toBe(1);
+    expect(spec.answers.location).toBe('Sõpruse pst 212, Mustamäe, Tallinn');
+    expect(spec.answers.desiredDate).toBe('2030-06-15');
+    expect(spec.answers.pricing).toBe('Ühikuhind koos koguhinnaga');
+    expect(spec.answers).not.toHaveProperty('areaM2');
+    expect(spec.answers).not.toHaveProperty('snowStorage');
+    if (formId === 'pest') {
+      expect(spec.answers.pests).toEqual(['Rotid', 'Hiired']);
+      expect(spec.answers.frequency).toBe('Kord kuus');
+      await expect(page.getByText('Kord kuus', { exact: true })).toBeVisible();
+    } else if (formId === 'branches') {
+      expect(spec.answers.cuttingScope).toBe('Lõigata ainult maha langenud okste osad.');
+      await expect(
+        page.getByText('Lõigata ainult maha langenud okste osad.', { exact: true }),
+      ).toBeVisible();
+    } else if (formId === 'energy') {
+      expect(spec.answers.heatedArea).toBe(3500.5);
+    } else {
+      expect(spec.answers.serviceName).toBe('Trepikodade suurpuhastus');
+    }
+    await nextAction(page, 'Avalda hange');
+    created.push({ id, title, formId, label });
+  }
+  await navigate(page, 'Hanked');
+  const filter = page.getByLabel('Hanketüüp', { exact: true });
+  for (const item of created) {
+    await filter.selectOption(item.formId);
+    const cards = page.locator('.procurement-card');
+    await expect(cards.filter({ hasText: item.title })).toHaveCount(1);
+    const badges = await cards.locator('.service-badge').allTextContents();
+    expect(badges.length).toBeGreaterThan(0);
+    expect(badges.every((label) => label === item.label)).toBe(true);
+    await expectResponsive(page);
+  }
+  await filter.selectOption('all');
+
+  for (const item of created)
+    await expect(page.getByRole('link').filter({ hasText: item.title })).toHaveCount(1);
+  const pest = created.find((item) => item.formId === 'pest')!;
+  await page.goto('/#procurement/' + pest.id);
+  await nextAction(page, 'Kutsu naabrid');
+  await page.getByRole('button', { name: 'Saada kutsed', exact: true }).click();
+  await expect(
+    page.getByRole('status').filter({ hasText: 'Piirkonna ühistutele on saadetud' }),
+  ).toBeVisible();
+  await logout(page);
+  await login(page, 'supplier@demo.test');
+  await page.goto('/#procurement/' + pest.id);
+  await nextAction(page, 'Esita pakkumine');
+  await page.getByLabel('Teenuse tavahind (€)', { exact: true }).fill('1000');
+  await page.getByLabel('Tagatisraha (€)', { exact: true }).fill('100.03');
+  await page.getByLabel(/^Osalejate arv(?! 2)/).fill('2');
+  await page.getByLabel('Teenuse hind (€)', { exact: true }).fill('900');
+  await page.getByLabel('Osalejate arv 2', { exact: true }).fill('3');
+  await page.getByLabel('Teenuse hind (€) 2', { exact: true }).fill('700');
+  await page
+    .getByLabel('Pakkumise tingimused', { exact: true })
+    .fill('Kord kuus: ohutu kahjuritõrje ja tulemuse kontroll.');
+  await page.getByRole('button', { name: 'Saada pakkumine', exact: true }).click();
+  await expect(
+    page.getByRole('status').filter({ hasText: 'Pakkumine on esitatud.' }),
+  ).toBeVisible();
+  await logout(page);
+  await login(page);
+  await page.goto('/#procurement/' + pest.id);
+  await nextAction(page, 'Võrdle ja vali pakkumine');
+  await page.getByRole('button', { name: 'Vali pakkumine', exact: true }).click();
+  for (let buyer = 1; buyer <= 2; buyer++) {
+    if (buyer === 2) {
+      await logout(page);
+      await page.getByRole('button', { name: 'Naaberühistu', exact: true }).click();
+      await expect(page.getByRole('button', { name: 'Logi välja', exact: true })).toBeVisible();
+      await navigate(page, /^Postkast/);
+      const inbox = await api<MailboxResponse>(page.request, '/mailbox');
+      const invitation = inbox.messages.find(
+        (message) => message.procurementId === pest.id && message.kind === 'INVITATION',
+      )!;
+      expect(invitation).toBeDefined();
+      const letter = page.getByTestId('mailbox-message').filter({ hasText: invitation.subject });
+      await letter.getByRole('button', { name: 'Ava kiri', exact: true }).click();
+      const detail = page.getByTestId('mailbox-detail');
+      await expect(detail).not.toContainText(/lumekoristus/i);
+      await detail.getByRole('button', { name: 'Võta kutse vastu', exact: true }).click();
+      await expect(detail).toContainText(/vastu võetud/i);
+      await detail.getByRole('link', { name: 'Vaata hanget', exact: true }).click();
+    }
+    await nextAction(page, 'Kinnita liitumine');
+    await page
+      .getByRole('checkbox', {
+        name: 'Kinnitan, et mul on õigus ühistu nimel kohustusi võtta.',
+        exact: true,
+      })
+      .check();
+    await page
+      .getByRole('checkbox', {
+        name: 'Kinnitan ühise teenuse ulatuse, pakkumise ja tagatisraha tingimused.',
+        exact: true,
+      })
+      .check();
+    await page.getByRole('button', { name: 'Liitu hankega', exact: true }).click();
+    await page.getByText('Liitumisel kinnitatud tingimused', { exact: true }).click();
+    const history = page.getByTestId('agreement-history');
+    await expect(history).toContainText('Kahjuritõrje');
+    await expect(history).toContainText('Rotid, Hiired');
+    await expect(history).toContainText('Kord kuus');
+    await expect(history).toContainText('Ühikuhind koos koguhinnaga');
+    await expect(history).not.toContainText('Koristusala');
+    await expect(history).toContainText('Kord kuus: ohutu kahjuritõrje ja tulemuse kontroll.');
+    await page.getByText('Liitumisel kinnitatud tingimused', { exact: true }).click();
+    await nextAction(page, 'Tee testmakse');
+    await expect(
+      page.getByText('TESTMAKSE · Tegelikku raha ei liigu', { exact: true }).first(),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Kinnita testmakse', exact: true }).click();
+    await expect(page.getByText(buyer + ' makstud liitumist', { exact: true })).toBeVisible();
+    await expectResponsive(page);
+  }
+  const completed = await api<ProcurementDetail>(page.request, '/procurements/' + pest.id);
+  expect(completed.procurement.status).toBe('SUCCEEDED');
+  expect(completed.procurement.activeCount).toBe(2);
+  expect(completed.procurement.bestPriceCents).toBe(90_000);
+  expect(
+    completed.commitments.every(
+      (row) =>
+        'formId' in row.acceptanceSnapshot.spec && row.acceptanceSnapshot.spec.formId === 'pest',
+    ),
+  ).toBe(true);
+  const branches = created.find((item) => item.formId === 'branches')!;
+  const supplier = await api<SessionResponse>(page.request, '/login', {
+    email: 'supplier@demo.test',
+    password: 'Demo2026!',
+  });
+  const supplierId = supplier.memberships.find(
+    (membership) =>
+      membership.status === 'approved' &&
+      membership.role === 'representative' &&
+      membership.organization.orgType === 'SUPPLIER',
+  )!.organizationId;
+  const { offer } = await api<{ offer: Offer }>(
+    page.request,
+    '/procurements/' + branches.id + '/offers',
+    {
+      organizationId: supplierId,
+      basePriceCents: 100_000,
+      depositCents: 10_003,
+      terms: 'Okste koristamine vastavalt ühisele tööde ulatusele.',
+      validUntil: new Date(Date.now() + 14 * 86_400_000).toISOString(),
+      tiers: [{ minParticipants: 1000, priceCents: 90_000 }],
+    },
+  );
+  await api(page.request, '/login', { email: 'buyer1@demo.test', password: 'Demo2026!' });
+  await api(page.request, '/procurements/' + branches.id + '/select-offer', { offerId: offer.id });
+  await page.goto('/#procurement/' + branches.id);
+  await page.reload();
+  await expect(page.getByRole('heading', { name: branches.title, exact: true })).toBeVisible();
+  await expectPaidProgress(page, 0, 1000);
+  const dots = page.getByTestId('participant-progress').getByTestId('participant-dot');
+  expect(await dots.count()).toBeGreaterThan(0);
+  expect(await dots.count()).toBeLessThanOrEqual(20);
   await expectResponsive(page);
 });

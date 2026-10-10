@@ -108,9 +108,9 @@ export default function ProcurementFlow({
       description =
         'Algataja võrdleb pakkumisi. Valiku teavitus jõuab sinu postkasti. Pakkumist saad muuta kuni esimese liitumiseni.';
     } else {
-      title = 'Esita lumekoristuse pakkumine';
+      title = 'Esita teenuse pakkumine';
       description =
-        'Määra hooaja brutohind, osalejate hinnatasemed ja TEST tagatis. Algataja valib ühe ühise pakkumise.';
+        'Määra kogu teenuse brutohind, osalejate hinnatasemed ja TEST tagatis. Algataja valib ühe ühise pakkumise.';
     }
     const hasOffer = offers.some((item) => item.organizationId === organization?.id);
     label = !p.frozenAt && !hasOffer ? 'Esita pakkumine' : 'Vaata pakkumist';
@@ -136,7 +136,7 @@ export default function ProcurementFlow({
   } else if (own && offers.length && !selected) {
     title = 'Vali ühine teenusepakkuja';
     description =
-      'Võrdle hooaja hindu ja tingimusi. Pärast ühe pakkumise valimist saavad ühistud oma osalemise kinnitada.';
+      'Võrdle pakkumiste hindu ja tingimusi. Pärast ühe pakkumise valimist saavad ühistud oma osalemise kinnitada.';
     label = 'Võrdle ja vali pakkumine';
     target = 'offers';
   } else if (own && !invitations.length) {

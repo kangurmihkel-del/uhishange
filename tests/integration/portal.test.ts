@@ -11,6 +11,7 @@ import type {
   Organization,
   Procurement,
   SessionResponse,
+  ServiceSpec,
 } from '../../src/shared/types.js';
 import {
   Client,
@@ -1017,5 +1018,264 @@ describe('deadline processing, historical records and administration', () => {
       'private@import.test',
     );
     await runtime.buyers[0].error('POST', '/admin/import', { csv }, 403);
+  });
+});
+
+function versionedSpec(formId: ServiceSpec['formId']): ServiceSpec {
+  const common = {
+    location: 'Sõpruse pst 212, Mustamäe, Tallinn',
+    access: 'Värava avab ühistu esindaja.',
+    desiredDate: '2030-06-15',
+    pricing: 'Fikseeritud koguhind',
+  };
+  const answers: Record<ServiceSpec['formId'], ServiceSpec['answers']> = {
+    snow: {
+      seasonStart: '2030-11-01',
+      seasonEnd: '2031-04-01',
+      areaM2: 600,
+      parkingM2: 200,
+      walkwayM: 80,
+      triggerCm: 3,
+      responseHours: 4,
+      gritting: true,
+      snowHauling: true,
+      snowStorage: 'Lumi kogutakse hoovi serva ja veetakse lubatud ladestuspaika.',
+    },
+    pest: {
+      pests: ['Rotid', 'Hiired'],
+      extent: 'Kelder ja prügimaja.',
+      apartments: 60,
+      treatment: 'Regulaarne hooldus',
+      frequency: 'Kord kuus',
+      safety: 'Lukustatud söödakastid; lapsi ja lemmikloomi tuleb kaitsta.',
+      repeat: 'Igal visiidil kontrollitakse tulemust.',
+    },
+    energy: {
+      building: 'Olemasolev hoone',
+      heatedArea: 3500.5,
+      consumption: 'Osaliselt olemas',
+      recommendations: true,
+    },
+    branches: {
+      volume: 5.5,
+      collected: true,
+      cutting: true,
+      cuttingScope: 'Lõigata ainult maha langenud okste osad.',
+      disposal: true,
+    },
+    other: {
+      serviceName: 'Trepikodade suurpuhastus',
+      workDescription: 'Pesta kolme trepikoja põrandad ja käsipuud.',
+      quantity: '3 trepikoda',
+      siteVisit: true,
+    },
+  };
+  return { formId, version: 1, answers: { ...answers[formId], ...common } };
+}
+
+describe('versioned service forms and demo upgrade', () => {
+  it('creates all five source forms and rejects malformed, hidden and incompatible answers through HTTP', async () => {
+    for (const formId of ['snow', 'pest', 'energy', 'branches', 'other'] as const) {
+      const spec = versionedSpec(formId);
+      const p = await procurement(runtime.buyers[0], { spec });
+      expect((await detail(runtime.buyers[0], p.id)).procurement.spec).toEqual(spec);
+      await runtime.buyers[0].post('/procurements/' + p.id + '/publish');
+      expect((await detail(runtime.buyers[0], p.id)).procurement.status).toBe('OPEN');
+    }
+    const legacy = procurementInput(runtime.buyers[0]).spec;
+    const p = await procurement(runtime.buyers[0], { spec: legacy });
+    expect((await detail(runtime.buyers[0], p.id)).procurement.spec).toEqual(legacy);
+    expect((await detail(runtime.buyers[0], p.id)).procurement.spec).not.toHaveProperty('formId');
+
+    const snow = versionedSpec('snow');
+    const pest = versionedSpec('pest');
+    const branches = versionedSpec('branches');
+    const energy = versionedSpec('energy');
+    const other = versionedSpec('other');
+    const invalid = [
+      { ...pest, formId: 'unknown' },
+      { ...pest, version: 2 },
+      { ...pest, version: '1' },
+      { ...pest, irrelevant: true },
+      { ...pest, answers: { ...pest.answers, unknown: 'untrusted' } },
+      { ...pest, answers: { ...pest.answers, areaM2: 300 } },
+      { ...pest, answers: { ...pest.answers, location: '' } },
+      { ...pest, answers: { ...pest.answers, pricing: 'Vaba ühikuhind' } },
+      { ...pest, answers: { ...pest.answers, desiredDate: '2030-02-30' } },
+      { ...pest, answers: { ...pest.answers, pests: [] } },
+      { ...pest, answers: { ...pest.answers, pests: ['Rotid', 'Rotid'] } },
+      { ...pest, answers: { ...pest.answers, pests: ['Karud'] } },
+      { ...pest, answers: { ...pest.answers, pests: 'Rotid' } },
+      { ...pest, answers: { ...pest.answers, apartments: 1.5 } },
+      { ...pest, answers: { ...pest.answers, frequency: undefined } },
+      { ...pest, answers: { ...pest.answers, treatment: 'Ühekordne tõrje' } },
+      { ...pest, answers: { ...pest.answers, frequency: 'Iga päev' } },
+      { ...snow, answers: { ...snow.answers, snowStorage: undefined } },
+      { ...snow, answers: { ...snow.answers, snowHauling: false } },
+      { ...snow, answers: { ...snow.answers, seasonEnd: '2030-10-31' } },
+      { ...snow, answers: { ...snow.answers, seasonStart: '2030-02-30' } },
+      { ...snow, answers: { ...snow.answers, responseHours: 169 } },
+      { ...branches, answers: { ...branches.answers, cuttingScope: undefined } },
+      { ...branches, answers: { ...branches.answers, cutting: false } },
+      { ...branches, answers: { ...branches.answers, volume: 0 } },
+      { ...branches, answers: { ...branches.answers, collected: 'true' } },
+      { ...energy, answers: { ...energy.answers, heatedArea: 0 } },
+      { ...energy, answers: { ...energy.answers, consumption: 'Teadmata' } },
+      { ...other, answers: { ...other.answers, serviceName: ' ' } },
+      { ...other, answers: { ...other.answers, workDescription: 'x'.repeat(10_001) } },
+    ];
+    const before = await runtime.pool.query<{ count: number }>(
+      'SELECT COUNT(*)::integer count FROM procurements',
+    );
+    for (const spec of invalid) {
+      const error = await runtime.buyers[0].error(
+        'POST',
+        '/procurements',
+        procurementInput(runtime.buyers[0], { spec }),
+        400,
+      );
+      expect(error.code).toBe('VALIDATION_ERROR');
+    }
+    const after = await runtime.pool.query<{ count: number }>(
+      'SELECT COUNT(*)::integer count FROM procurements',
+    );
+    expect(after.rows).toEqual(before.rows);
+
+    const oneOff: ServiceSpec = {
+      ...pest,
+      answers: { ...pest.answers, treatment: 'Ühekordne tõrje' },
+    };
+    delete oneOff.answers.frequency;
+    expect((await procurement(runtime.buyers[0], { spec: oneOff })).spec).toEqual(oneOff);
+    const noCutting: ServiceSpec = {
+      ...branches,
+      answers: { ...branches.answers, cutting: false },
+    };
+    delete noCutting.answers.cuttingScope;
+    expect((await procurement(runtime.buyers[0], { spec: noCutting })).spec).toEqual(noCutting);
+  });
+
+  it('adds four fictional demo types idempotently while preserving existing procurement and financial history', async () => {
+    const ids = [1, 2, 3, 4].map(
+      (number) => 'd5010001-0000-4000-8000-' + String(number).padStart(12, '0'),
+    );
+    const demos = await runtime.pool.query<{ id: string; spec: ServiceSpec; status: string }>(
+      'SELECT id,spec,status FROM procurements WHERE id=ANY($1::uuid[]) ORDER BY id',
+      [ids],
+    );
+    expect(demos.rows.map((row) => row.spec.formId)).toEqual([
+      'pest',
+      'energy',
+      'branches',
+      'other',
+    ]);
+    expect(demos.rows.every((row) => row.status === 'OPEN' && row.spec.version === 1)).toBe(true);
+    for (const p of demos.rows) {
+      const state = await detail(runtime.buyers[0], p.id);
+      expect(state.procurement.organizationId).toBe(runtime.buyers[0].organization.id);
+      expect(state.offers).toHaveLength(1);
+      expect(state.procurement.selectedOfferId).toBeNull();
+      expect(state.commitments).toHaveLength(0);
+      expect(state.contracts).toHaveLength(0);
+      const neighborMail = await mailbox(runtime.buyers[1], p.id, 'INVITATION');
+      expect(neighborMail).toHaveLength(1);
+      expect(neighborMail[0].subject).toContain(state.procurement.title);
+    }
+    const { procurement: existing } = await selectedProcurement(runtime);
+    const accepted = await commit(runtime.buyers[0], existing.id);
+    await capture(runtime.buyers[0], accepted.id);
+    const before = await detail(runtime.admin, existing.id);
+    const financial = await ledger(existing.id);
+    const counts = await runtime.pool.query(
+      'SELECT (SELECT COUNT(*) FROM procurements) procurements,(SELECT COUNT(*) FROM invitations) invitations,(SELECT COUNT(*) FROM mailbox_messages) messages,(SELECT COUNT(*) FROM jobs) jobs,(SELECT COUNT(*) FROM ledger) ledger,(SELECT COUNT(*) FROM audit) audit',
+    );
+    const { bootstrap } = await import('../../src/server/bootstrap.js');
+    await Promise.all([bootstrap({ seed: true }), bootstrap({ seed: true })]);
+    const afterCounts = await runtime.pool.query(
+      'SELECT (SELECT COUNT(*) FROM procurements) procurements,(SELECT COUNT(*) FROM invitations) invitations,(SELECT COUNT(*) FROM mailbox_messages) messages,(SELECT COUNT(*) FROM jobs) jobs,(SELECT COUNT(*) FROM ledger) ledger,(SELECT COUNT(*) FROM audit) audit',
+    );
+    expect(afterCounts.rows).toEqual(counts.rows);
+    expect(await detail(runtime.admin, existing.id)).toEqual(before);
+    expect(await ledger(existing.id)).toEqual(financial);
+    const afterDemos = await runtime.pool.query(
+      'SELECT id,spec,status FROM procurements WHERE id=ANY($1::uuid[]) ORDER BY id',
+      [ids],
+    );
+    expect(afterDemos.rows).toEqual(demos.rows);
+  });
+
+  it('preserves a non-snow acceptance and final scope through lower pricing, withdrawal, real-worker deadline and payout', async () => {
+    const spec = versionedSpec('pest');
+    const deadline = future(5_000);
+    const p = await procurement(runtime.buyers[0], { spec, joinDeadlineAt: deadline });
+    await runtime.buyers[0].post('/procurements/' + p.id + '/publish');
+    const { offer } = await runtime.supplier.post<{ offer: Offer }>(
+      '/procurements/' + p.id + '/offers',
+      {
+        organizationId: runtime.supplier.organization.id,
+        basePriceCents: 100_000,
+        depositCents: 13,
+        terms: 'Kord kuus: lukustatud söödakastid ja tulemuse kontroll.',
+        validUntil: future(),
+        tiers: [
+          { minParticipants: 1, priceCents: 90_000 },
+          { minParticipants: 2, priceCents: 70_000 },
+        ],
+      },
+    );
+    await runtime.buyers[0].post('/procurements/' + p.id + '/select-offer', { offerId: offer.id });
+    const first = await commit(runtime.buyers[0], p.id);
+    const second = await commit(runtime.buyers[1], p.id);
+    expect(first.acceptanceSnapshot.spec).toEqual(spec);
+    expect(second.acceptanceSnapshot.spec).toEqual(spec);
+    expect(first.acceptanceSnapshot.paymentMode).toBe('TEST');
+    await expect(
+      runtime.pool.query('UPDATE procurements SET spec=$1 WHERE id=$2', [
+        versionedSpec('energy'),
+        p.id,
+      ]),
+    ).rejects.toThrow('Frozen procurement');
+    await expect(
+      runtime.pool.query('UPDATE commitments SET acceptance_snapshot=$1 WHERE id=$2', [
+        { ...first.acceptanceSnapshot, spec: versionedSpec('energy') },
+        first.id,
+      ]),
+    ).rejects.toThrow('immutable');
+    await capture(runtime.buyers[0], first.id);
+    await capture(runtime.buyers[1], second.id);
+    await runtime.buyers[1].post('/commitments/' + second.id + '/withdraw');
+    const worker = await startWorker(runtime);
+    try {
+      await waitUntil(deadline);
+      await waitForFinalization(runtime, p.id);
+    } finally {
+      await worker.stop();
+    }
+    const after = await detail(runtime.admin, p.id);
+    expect(after.procurement.status).toBe('FINALIZED');
+    expect(after.procurement.spec).toEqual(spec);
+    expect(after.procurement.bestPriceCents).toBe(70_000);
+    expect(after.contracts).toHaveLength(1);
+    expect(after.contracts[0].finalSnapshot.spec).toEqual(spec);
+    expect(after.contracts[0].priceCents).toBe(70_000);
+    expect(after.contracts[0].depositCreditCents).toBe(13);
+    expect(after.contracts[0].balanceCents).toBe(69_987);
+    expect(after.commitments.find((row) => row.id === first.id)?.acceptanceSnapshot).toEqual(
+      first.acceptanceSnapshot,
+    );
+    const allocated = await ledger(p.id);
+    expect(allocated.DEPOSIT).toEqual({ count: 2, total: 26 });
+    expect(allocated.PLATFORM_FEE).toEqual({ count: 2, total: 2 });
+    expect(allocated.SUPPLIER_PAYOUT).toEqual({ count: 2, total: 24 });
+    expect(allocated.REFUND).toBeUndefined();
+    await finalize();
+    expect(await ledger(p.id)).toEqual(allocated);
+    expect(await mailbox(runtime.buyers[0], p.id, 'PROCUREMENT_FINALIZED')).toHaveLength(1);
+    await expect(
+      runtime.pool.query('UPDATE contracts SET final_snapshot=$1 WHERE id=$2', [
+        { ...after.contracts[0].finalSnapshot, spec: versionedSpec('energy') },
+        after.contracts[0].id,
+      ]),
+    ).rejects.toThrow('immutable');
   });
 });

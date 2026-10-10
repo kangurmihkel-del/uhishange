@@ -1,7 +1,7 @@
 import type { PoolClient } from 'pg';
 import type {
   User,
-  SnowSpec,
+  ProcurementSpec,
   PriceTier,
   OrganizationType,
   AgreementSnapshot,
@@ -22,7 +22,7 @@ export interface ProcurementRow {
   description: string;
   radius_m: number;
   join_deadline_at: Date;
-  spec: SnowSpec;
+  spec: ProcurementSpec;
   status: string;
   selected_offer_id: string | null;
   succeeded_at: Date | null;

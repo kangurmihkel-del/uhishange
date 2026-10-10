@@ -71,8 +71,8 @@ export async function backfillInvitationMessages(
     `INSERT INTO mailbox_messages(organization_id,organization_name,procurement_id,procurement_title,invitation_id,kind,audience,subject,body,event_key,created_at)
  SELECT i.organization_id,o.name,i.procurement_id,p.title,i.id,'INVITATION','MEMBERS',
  'Kutse ühishankesse: ' || p.title,
- CASE WHEN o.org_type='SUPPLIER' THEN 'Teid on kutsutud esitama lumekoristuse pakkumist. Avage ühishange, tutvuge tööde kirjeldusega ja lisage pakkumine. Kutse ei anna organisatsiooni esindusõigust.'
- ELSE 'Teie ühistu on kutsutud ühisesse lumekoristuse hankesse. Avage ühishange ning tutvuge naabrite ja tingimustega. Kutse vastuvõtmine on eraldi liitumisest ja TEST ettemakse tasumisest. Kutse ei anna organisatsiooni esindusõigust.' END,
+ CASE WHEN o.org_type='SUPPLIER' THEN 'Teid on kutsutud esitama teenuse pakkumist. Avage ühishange, tutvuge tööde kirjeldusega ja lisage pakkumine. Kutse ei anna organisatsiooni esindusõigust.'
+ ELSE 'Teie ühistu on kutsutud ühisesse teenuse hankesse. Avage ühishange ning tutvuge naabrite ja tingimustega. Kutse vastuvõtmine on eraldi liitumisest ja TEST ettemakse tasumisest. Kutse ei anna organisatsiooni esindusõigust.' END,
  'INVITATION:' || i.id::text,i.created_at FROM invitations i JOIN organizations o ON o.id=i.organization_id JOIN procurements p ON p.id=i.procurement_id
  WHERE ($1::uuid IS NULL OR p.id=$1) ON CONFLICT(event_key) DO NOTHING`,
     [procurementId ?? null],
@@ -117,7 +117,7 @@ export async function messagesFromAudit(
     recipients = [p.organization_id];
     subject = 'Uus pakkumine: ' + p.title;
     body =
-      'Teenusepakkuja lisas või uuendas lumekoristuse pakkumist. Võrdle hindu ja tingimusi ning vali ühine pakkumine enne ühistute liitumist.';
+      'Teenusepakkuja lisas või uuendas teenuse pakkumist. Võrdle hindu ja tingimusi ning vali ühine pakkumine enne ühistute liitumist.';
   } else if (action.startsWith('TEST_PAYMENT') || action === 'LATE_PAYMENT_REFUNDED') {
     const c = (
       await client.query('SELECT organization_id FROM commitments WHERE id=$1', [

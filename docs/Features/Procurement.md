@@ -1,6 +1,6 @@
-# Seasonal group snow-removal procurement
+# Group service procurement
 
-Owner: project maintainer. Housing associations combine nearby demand into one supplier-selected seasonal order. The first price tier defines the success threshold; later tiers lower the gross per-association price.
+Owner: project maintainer. Housing associations combine nearby demand into one supplier-selected service order. The first price tier defines the success threshold; later tiers lower the gross per-association price.
 
 ## Flow
 
@@ -20,11 +20,11 @@ flowchart TD
 
 ## Rules
 
-- Buyer organizations are housing associations; one seasonal snow-removal category in Mustamäe. The organization primary address supplies the procurement center. Radius defaults to 500 m and is configurable. Nearby search uses WGS84 coordinates.
+- Buyer organizations are housing associations; the five demo service categories in Mustamäe: snow removal, pest control, energy certificates, branch cleanup and a free-form service. The organization primary address supplies the procurement center. Radius defaults to 500 m and is configurable. Nearby search uses WGS84 coordinates.
 - Only buyers inside the configured geographic radius may commit, except the initiator.
 - Authentication is local email/password. Organization membership needs admin approval. Invitations do not grant authority.
 - Initiator selects one offer before commitments. Terms, service scope, tiers, fee and deposit freeze on the first pending commitment. One pending/active/contracted commitment per buyer per procurement.
-- Supplier fixed EUR deposit cannot exceed the cheapest tier price. All prices are supplier-entered gross seasonal prices. Buyers confirm authority and the common service scope.
+- Supplier fixed EUR deposit cannot exceed the cheapest tier price. All prices are supplier-entered gross prices for the complete described service per association; snow removal uses a seasonal total. Buyers confirm authority and the common service scope.
 - Only confirmed paid ACTIVE commitments count. Success latches exactly once. Best achieved tier never regresses after success. Joining stays open until deadline.
 - Before success, withdrawal triggers a full immediate test refund. After success it forfeits the deposit; success history remains.
 - At deadline, failed groups refund all captured deposits. Successful groups get one contract per continuing buyer, final price snapshot, gross deposit credit and remaining direct-invoice balance. Retained deposits are distributed 4% platform fee (nearest cent), remainder supplier share.
@@ -48,6 +48,14 @@ The in-app demo mailbox shows durable procurement invitations and lifecycle mess
 Messages link to the relevant procurement or contract. Invitation messages retain the existing accept/decline operations and explicitly say that accepting is separate from joining/paying. Supplier publication notifies the initiator, offer selection notifies the supplier and invited buyers, success and finalization notify involved organizations, and failure/cancellation explain test refunds. Financial messages remain labeled TEST.
 
 The procurement page presents the process and next action above secondary details: publish a draft, find/invite neighbors, receive/choose an offer, confirm participation and test payment, wait for the joining deadline, then review the contract and complete/rate the service. The next action depends on lifecycle and approved organization role. Buttons open/scroll to the actual form or map; important forms do not require guessing a hidden tab. Terminal or expired states show their status and appropriate available history. The neighbor demo account buyer2@demo.test is a visible demo-login choice with password Demo2026!.
+
+## Versioned service forms
+
+Use the five types and question definitions in the retained Uhishange_vorm.html: snow (Lumekoristus), pest (Kahjuritõrje), energy (Energiamärgis), branches (Okste koristamine), other (Muu teenus – vabas vormis). Creation selects the type and shows its fields plus shared location, access conditions, desired date and pricing preference. Snow hauling requires snow-storage details; regular pest maintenance requires frequency; cutting branches requires its work description. Changing type or hiding a question clears its stale answers. Required fields, choices, numeric limits, dates and conditional visibility are validated on the server. A unit-price preference still requires the supplier's gross total for the complete service per association.
+
+Persist new requests as {formId,version,answers} in the existing JSONB spec and copy that complete value into frozen acceptance/final agreements. Version 1 definitions remain stable for historical rendering; introduce a new version for future incompatible questions. Continue accepting and rendering existing unversioned SnowSpec records and snapshots. All invitation, pricing-tier, commitment, TEST deposit, refund, fee and deadline rules remain unchanged. Four additional fictional, idempotently seeded procurements demonstrate the new types in existing databases without resetting data. Category badges/filter and neutral product wording make each service discoverable.
+
+Acceptance: create all five types through the API; reject unknown versions, hidden/unknown fields, invalid options/dates and missing conditional answers; preserve legacy data and frozen non-snow specifications; exercise non-snow creation and procurement workflows on desktop/mobile; seed upgrades remain idempotent.
 
 ## Definition of Done
 
