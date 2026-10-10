@@ -60,6 +60,14 @@ The following history screenshots come from the isolated browser acceptance data
 
 Dependency updates followed the [CSV parser advisory](https://github.com/advisories/GHSA-8cw4-87c7-c6xx) and [Vitest migration guide](https://vitest.dev/guide/migration/). The final lockfile installs csv-parse 7.0.3 and Vitest/coverage 5.0.3; both host and container installation audits reported zero vulnerabilities.
 
+## Public repository and hosted CI
+
+Published on 2026-10-10 to [viljarpuusepp/uhishange](https://github.com/viljarpuusepp/uhishange), with public visibility and default branch `main`. The initial source commit is `ab22e608cccdc57881fb4d902f351fc723435dc6`.
+
+[GitHub Actions verification run 38030577295](https://github.com/viljarpuusepp/uhishange/actions/runs/38030577295) passed on Ubuntu: dependency installation, PostgreSQL/PostGIS readiness, Chromium installation, production build, static analysis, all 20 integration/time tests and all 10 desktop/mobile browser workflows. The run uploaded the `verification-results` artifact and completed cleanup. These hosted results supplement the local checks above.
+
+The public commit excludes the original named-participant event poster and generated/private runtime files. [Source inventory](../Sources.md) records the unchanged local input files and public distribution.
+
 ## Runtime and handoff
 
 The final Compose state is: database healthy, application healthy, worker running and initializer exited successfully with code 0. The public health endpoint returned `status: ok`, `database: ready` and `paymentMode: TEST`. Database contents persisted across image rebuilds; the main database retained its single seeded procurement with no captured financial transactions. Integration and browser fixtures remain in their isolated test databases.

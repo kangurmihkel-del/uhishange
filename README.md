@@ -1,12 +1,18 @@
 # Ühishange
 
+[![Verify](https://github.com/viljarpuusepp/uhishange/actions/workflows/verify.yml/badge.svg)](https://github.com/viljarpuusepp/uhishange/actions/workflows/verify.yml)
+
+[Public source repository](https://github.com/viljarpuusepp/uhishange)
+
 A functional local pilot for housing associations procuring seasonal snow removal together in Mustamäe. The Estonian portal includes buyer, supplier and administrator workflows backed by PostgreSQL/PostGIS. All payments and payouts are simulated; invitations stay inside the portal.
 
 ## Start
 
-Install Docker Desktop with Compose, then run from this directory:
+Install Git and Docker Desktop with Compose, then clone and start:
 
 ```powershell
+git clone https://github.com/viljarpuusepp/uhishange.git
+cd uhishange
 docker compose up --build -d
 ```
 
@@ -73,6 +79,6 @@ Use the administrator CSV preview before confirming an atomic import. [CSV templ
 
 ## Documentation
 
-[Documentation index](docs/Home.md) links to behavior, architecture, API, verification and operations. Root AGENTS.md applies MCAF and names the user as maintainer. The four original input files are preserved.
+[Documentation index](docs/Home.md) links to behavior, architecture, API, verification and operations. Root AGENTS.md applies MCAF and names the user as maintainer. The four original input files are preserved unchanged in the local workspace. The public source includes both DOCX files and the process diagram; the event poster with participant names stays local. [Source inventory](docs/Sources.md) explains this distribution and records the original hashes.
 
 [Verification results](docs/Testing/RESULTS.md) include coverage and desktop/mobile screenshots from the running Docker portal.
