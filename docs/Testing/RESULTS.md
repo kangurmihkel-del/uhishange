@@ -9,7 +9,7 @@ The functional local pilot is running at http://localhost:3000. All required loc
 | Command                          | Result                                                                                       |
 | -------------------------------- | -------------------------------------------------------------------------------------------- |
 | npm run build                    | Passed: server TypeScript compilation and production Vite assets                             |
-| npm test                         | Passed: 26 integration/API/time tests and 12 browser workflows                               |
+| npm test                         | Passed: 32 integration/API/time/format tests and 12 browser workflows                        |
 | npm run analyze                  | Passed: strict TypeScript, ESLint and Prettier checks                                        |
 | npm audit --audit-level=moderate | Passed: zero reported vulnerabilities                                                        |
 | docker compose config --quiet    | Passed                                                                                       |
@@ -26,7 +26,7 @@ Final Vitest V8 coverage from the passing suite:
 
 | Scope                                                    | Statements | Branches | Functions | Lines  |
 | -------------------------------------------------------- | ---------- | -------- | --------- | ------ |
-| Configured server, client API/time and shared form files | 91.23%     | 71.16%   | 89.88%    | 92.92% |
+| Configured server, client API/time and shared form files | 92.46%     | 77.35%   | 92.73%    | 94.10% |
 | Reported server modules                                  | 94.24%     | 81.40%   | 98.49%    | 95.76% |
 | Transactional procurement domain                         | 96.02%     | 87.20%   | 100.00%   | 99.37% |
 
@@ -120,3 +120,23 @@ Updated screenshots above show the CVI. Additional public and mobile discovery v
 - [Mobile neighbor discovery](screenshots/neighbors-mobile.png)
 
 Locally bundled fonts and original licenses are documented in [public/fonts/README.md](../../public/fonts/README.md). The design decision and preserved business-rule precedence are recorded in [ADR 0004](../ADR/0004-cvi-design.md).
+
+## Estonian regional formats acceptance
+
+The full canonical test command passed 32 integration/API/time/format cases and 12 browser workflows (44 total). Six new format tests cover grouped/comma decimal entry, exact integer-cent conversion, malformed/mixed separators, calendar validation, numeric date display, service facts and Tallinn daylight-saving gaps/folds. Existing procurement races, refunds, frozen history and authority scenarios continue to pass.
+
+Desktop browser workflows run with en-US/America/Los_Angeles and mobile workflows with en-GB/Asia/Tokyo. Both enter Estonian numeric dates, grouped prices and comma coordinates through the actual forms, then inspect the exact saved ISO/UTC/numeric API values. A 100.03-euro deposit is stored as 10,003 cents; the 30.06.2030 12:30 joining deadline is stored as 2030-06-30T09:30:00.000Z. Display remains DD.MM.YYYY and 24-hour Europe/Tallinn regardless of these browser settings. Current participation and goals retain exact values with space grouping, including 1,000 participants.
+
+Configured V8 coverage is 92.46% statements, 77.35% branches, 92.73% functions and 94.10% lines. Client API/time/format helpers report 85.33%, 77.41%, 82.60% and 86.56%; shared service helpers report 82.50%, 67.76%, 69.56% and 84.93%. React inputs and views are covered by real browser workflows, outside the V8 percentage scope.
+
+The final explicit production build, canonical format and static analysis passed. Docker Compose rebuilt the app/worker without resetting persistent storage. Eighteen production smoke captures passed with zero browser errors and horizontal overflow; mobile creation and saved agreements were visually inspected. Database/application health and TEST mode are confirmed. SHA-256 checks match all seven retained sources, including the original four files, MCAF guide, service HTML and CVI document.
+
+## Full process recording acceptance
+
+The recorder follows the real production browser and a separate PostgreSQL/PostGIS database. Captured actions cover public entry, registration, organization approval, atomic CSV preview/import, procurement creation/publication, neighbor map/invitations, supplier tiers, offer selection, mailbox acceptance, three TEST-paid buyers, lower pricing, actual worker finalization, contracts, completion/ratings and administrator ledger/audit/jobs. Joining deadline waiting is removed from the exported timeline; the actual worker processes the originally submitted deadline. Season completion is explicitly labeled as a demo.
+
+Database assertions confirm three completed contracts at 70,000 cents each, 10,000-cent deposit credits, 60,000-cent balances and five-star ratings. Three captured TEST deposits total 30,000 cents; three 400-cent fees total 1,200 cents and three 9,600-cent supplier allocations total 28,800 cents. Whole-table fingerprints for users, organizations, procurements, commitments, contracts, ledger and audit match before/after in the main pilot database. Captured pages have zero browser errors and no horizontal overflow. Generated media and detailed evidence stay local in recordings/; [recording instructions](../Demo.md) are reproducible from the public source.
+
+The exported H.264 MP4 is 301.526 seconds (5:02), 1440×900 pixels and has 17 chapters. FFprobe assertions and complete-stream decoding passed. A contact sheet and decoded invitation, lower-price, contract, ledger and ending frames were visually inspected. The original WebM, chapter timings and verification JSON accompany the local MP4.
+
+Hosted verification exposed two asynchronous browser checks after the first branch run passed. Public navigation now reveals its focus target immediately, avoiding interrupted smooth-scroll animations during successive activations. Category assertions retry the nonempty, correctly filtered badge condition while a publish-triggered list refresh finishes. These checks retain the viewport, focus, exact route and category assertions; no sleeps or retries of entire failing tests were added.

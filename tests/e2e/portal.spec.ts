@@ -41,7 +41,13 @@ async function expectPaidProgress(
   await expect(progress).toHaveAttribute('aria-valuenow', String(Math.min(paidCount, threshold)));
   await expect(progress).toHaveAttribute(
     'aria-valuetext',
-    paidCount + ' / ' + threshold + ' makstud liitumist',
+    new RegExp(
+      '^' +
+        paidCount +
+        ' / ' +
+        (threshold === 1000 ? '1[ \\u00a0\\u202f]000' : threshold) +
+        ' makstud liitumist$',
+    ),
   );
 }
 
@@ -56,6 +62,9 @@ test('buyer, supplier and neighboring buyers reach a lower tier through the port
   await page
     .getByLabel('Kirjeldus', { exact: true })
     .fill('Parkimisala ja kõnniteede ühine talvine hooldus.');
+  await page.getByLabel('Liitumise tähtaeg', { exact: true }).fill('30.06.2030 12:30');
+  await serviceField(page, 'Hooaja algus').fill('01.11.2030');
+  await serviceField(page, 'Hooaja lõpp').fill('01.04.2031');
   await serviceField(page, 'Koristusala (m²)').fill('600');
   await page.getByRole('button', { name: 'Salvesta hange', exact: true }).click();
   await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
@@ -64,6 +73,10 @@ test('buyer, supplier and neighboring buyers reach a lower tier through the port
   await nextAction(page, 'Avalda hange');
   await expect(page.getByText('Liitumine avatud', { exact: true })).toBeVisible();
   const created = await api<ProcurementDetail>(page.request, '/procurements/' + id);
+  expect(created.procurement.joinDeadlineAt).toBe('2030-06-30T09:30:00.000Z');
+  expect((created.procurement.spec as ServiceSpec).answers.seasonStart).toBe('2030-11-01');
+  expect((created.procurement.spec as ServiceSpec).answers.seasonEnd).toBe('2031-04-01');
+  await expect(page.getByText('Liitumine 30.06.2030 12:30-ni', { exact: true })).toBeVisible();
   await api(page.request, '/organizations', {
     registryCode: 'MAP-' + Date.now(),
     name: uniqueTitle('Kaardi kattuv KÜ'),
@@ -94,12 +107,13 @@ test('buyer, supplier and neighboring buyers reach a lower tier through the port
   await page.goto('/#procurement/' + id);
   await nextAction(page, 'Esita pakkumine');
   await expect(page.getByLabel('Hooaja tavahind (€)', { exact: true })).toBeVisible();
-  await page.getByLabel('Hooaja tavahind (€)', { exact: true }).fill('1000');
-  await page.getByLabel('Tagatisraha (€)', { exact: true }).fill('100.03');
+  await page.getByLabel('Hooaja tavahind (€)', { exact: true }).fill('1 000,00');
+  await page.getByLabel('Tagatisraha (€)', { exact: true }).fill('100,03');
+  await page.getByLabel('Pakkumise kehtivus', { exact: true }).fill('30.06.2030 12:45');
   await page.getByLabel(/^Osalejate arv(?! 2)/).fill('2');
-  await page.getByLabel('Hooaja hind (€)', { exact: true }).fill('900');
+  await page.getByLabel('Hooaja hind (€)', { exact: true }).fill('900,00');
   await page.getByLabel('Osalejate arv 2', { exact: true }).fill('3');
-  await page.getByLabel('Hooaja hind (€) 2', { exact: true }).fill('700');
+  await page.getByLabel('Hooaja hind (€) 2', { exact: true }).fill('700,00');
   await page
     .getByLabel('Pakkumise tingimused', { exact: true })
     .fill('Õigeaegne lumekoristus ja libedusetõrje vastavalt teenuse ulatusele.');
@@ -107,6 +121,17 @@ test('buyer, supplier and neighboring buyers reach a lower tier through the port
   await expect(
     page.getByRole('status').filter({ hasText: 'Pakkumine on esitatud.' }),
   ).toBeVisible();
+  const submitted = await api<ProcurementDetail>(page.request, '/procurements/' + id);
+  expect(submitted.offers).toHaveLength(1);
+  expect(submitted.offers[0]).toMatchObject({
+    basePriceCents: 100_000,
+    depositCents: 10_003,
+    validUntil: '2030-06-30T09:45:00.000Z',
+    tiers: [
+      { minParticipants: 2, priceCents: 90_000 },
+      { minParticipants: 3, priceCents: 70_000 },
+    ],
+  });
   await logout(page);
   await login(page);
   await page.goto('/#procurement/' + id);
@@ -182,6 +207,9 @@ test('buyer, supplier and neighboring buyers reach a lower tier through the port
       );
       await expect(history).toContainText('Liitumine kinnitatud');
       await expect(history).toContainText('100,03');
+      await expect(history).toContainText('01.11.2030');
+      await expect(history).toContainText('01.04.2031');
+      await expect(history).toContainText('30.06.2030 12:30');
       await expect(history.locator('pre')).toHaveCount(0);
       await expectResponsive(page);
       await page.getByText('Liitumisel kinnitatud tingimused', { exact: true }).click();
@@ -315,8 +343,15 @@ test('registration, organization approval, atomic CSV import and job retry are u
     .fill(String(80_000_000 + Math.floor(Math.random() * 9_999_999)));
   await page.getByLabel('Kontakti e-post', { exact: false }).fill('private@browser.test');
   await page.getByLabel('Aadress', { exact: true }).fill('Mustamäe tee 123, Tallinn');
+  await page.getByLabel('Laiuskraad (WGS84)', { exact: true }).fill('59,405123');
+  await page.getByLabel('Pikkuskraad (WGS84)', { exact: true }).fill('24,690456');
   await page.getByRole('button', { name: 'Lisa organisatsioon', exact: true }).click();
   await expect(page.getByText('Kinnitus ootel', { exact: true }).first()).toBeVisible();
+  const pendingOrganization = (
+    await api<SessionResponse>(page.request, '/session')
+  ).memberships.find((item) => item.organization.name === organizationName)!.organization;
+  expect(pendingOrganization.latitude).toBe(59.405123);
+  expect(pendingOrganization.longitude).toBe(24.690456);
   await logout(page);
   await login(page, 'admin@demo.test');
   await navigate(page, 'Haldus');
@@ -372,11 +407,19 @@ test('registration, organization approval, atomic CSV import and job retry are u
   await page.getByRole('button', { name: 'Muuda profiili', exact: true }).click();
   const updatedAddress = 'Mustamäe tee 124, Tallinn';
   await page.getByLabel('Aadress', { exact: true }).fill(updatedAddress);
+  await page.getByLabel('Laiuskraad (WGS84)', { exact: true }).fill('59,405234');
+  await page.getByLabel('Pikkuskraad (WGS84)', { exact: true }).fill('24,690567');
   await page.getByRole('button', { name: 'Salvesta profiil', exact: true }).click();
   await expect(page.getByText(updatedAddress, { exact: true })).toBeVisible();
   await expect(
     page.getByRole('status').filter({ hasText: 'Organisatsiooni profiil on uuendatud.' }),
   ).toBeVisible();
+  const updatedOrganization = (
+    await api<SessionResponse>(page.request, '/session')
+  ).memberships.find((item) => item.organization.name === organizationName)!.organization;
+  expect(updatedOrganization.latitude).toBe(59.405234);
+  expect(updatedOrganization.longitude).toBe(24.690567);
+  await expect(page.getByText('59,405234; 24,690567', { exact: true })).toBeVisible();
 });
 
 test('individual contracts expose final prices, accept ratings and retain cancelled history', async ({
@@ -476,14 +519,17 @@ test('individual contracts expose final prices, accept ratings and retain cancel
     await expect(history).toContainText(frozenBuyer.address);
     await expect(history).not.toContainText(changedName);
     await expect(history).not.toContainText('Muudetud aadress, Tallinn');
-    const tallinnTime = new Intl.DateTimeFormat('et-EE', {
+    const tallinnParts = new Intl.DateTimeFormat('en-GB', {
       timeZone: 'Europe/Tallinn',
-      day: 'numeric',
-      month: 'short',
+      day: '2-digit',
+      month: '2-digit',
       year: 'numeric',
       hour: '2-digit',
       minute: '2-digit',
-    }).format(new Date(fixture.contract.finalSnapshot.finalizedAt));
+      hourCycle: 'h23',
+    }).formatToParts(new Date(fixture.contract.finalSnapshot.finalizedAt));
+    const part = (type: string) => tallinnParts.find((item) => item.type === type)?.value;
+    const tallinnTime = `${part('day')}.${part('month')}.${part('year')} ${part('hour')}:${part('minute')}`;
     await expect(history).toContainText(tallinnTime);
     await expectResponsive(page);
     await contract.screenshot({
@@ -651,7 +697,7 @@ test('source service types use conditional questions, clear stale answers and re
       .fill('Ühise teenuse täpne kirjeldus lähikonna ühistutele.');
     await serviceField(page, 'Tööde asukoht').fill('Sõpruse pst 212, Mustamäe, Tallinn');
     await serviceField(page, 'Ligipääs ja eritingimused').fill('Esindaja avab värava.');
-    await serviceField(page, 'Soovitud tööde kuupäev').fill('2030-06-15');
+    await serviceField(page, 'Soovitud tööde kuupäev').fill('15.06.2030');
     await serviceField(page, 'Soovitud hinnapakkumise vorm').selectOption(
       'Ühikuhind koos koguhinnaga',
     );
@@ -673,13 +719,13 @@ test('source service types use conditional questions, clear stale answers and re
       );
     } else if (formId === 'energy') {
       await serviceField(page, 'Hoone liik').selectOption('Olemasolev hoone');
-      await serviceField(page, 'Köetav pind (m²)').fill('3500.5');
+      await serviceField(page, 'Köetav pind (m²)').fill('3\u00a0500,5');
       await serviceField(page, 'Energiatarbimise andmed').selectOption('Osaliselt olemas');
       await page
         .getByRole('checkbox', { name: 'Soovin ka energiatõhususe soovitusi', exact: true })
         .check();
     } else if (formId === 'branches') {
-      await serviceField(page, 'Okste hinnanguline maht (m³)').fill('5.5');
+      await serviceField(page, 'Okste hinnanguline maht (m³)').fill('5,5');
       await page.getByRole('checkbox', { name: 'Oksad on kokku kogutud', exact: true }).check();
       await page.getByRole('checkbox', { name: 'Vajalik on ka lõikamine', exact: true }).check();
       await serviceField(page, 'Lõikamistööde kirjeldus').fill('Vana tingimus.');
@@ -710,6 +756,7 @@ test('source service types use conditional questions, clear stale answers and re
     expect(spec.version).toBe(1);
     expect(spec.answers.location).toBe('Sõpruse pst 212, Mustamäe, Tallinn');
     expect(spec.answers.desiredDate).toBe('2030-06-15');
+    await expect(page.getByText('15.06.2030', { exact: true })).toBeVisible();
     expect(spec.answers.pricing).toBe('Ühikuhind koos koguhinnaga');
     expect(spec.answers).not.toHaveProperty('areaM2');
     expect(spec.answers).not.toHaveProperty('snowStorage');
@@ -718,12 +765,15 @@ test('source service types use conditional questions, clear stale answers and re
       expect(spec.answers.frequency).toBe('Kord kuus');
       await expect(page.getByText('Kord kuus', { exact: true })).toBeVisible();
     } else if (formId === 'branches') {
+      expect(spec.answers.volume).toBe(5.5);
+      await expect(page.getByText('5,5 m³', { exact: true })).toBeVisible();
       expect(spec.answers.cuttingScope).toBe('Lõigata ainult maha langenud okste osad.');
       await expect(
         page.getByText('Lõigata ainult maha langenud okste osad.', { exact: true }),
       ).toBeVisible();
     } else if (formId === 'energy') {
       expect(spec.answers.heatedArea).toBe(3500.5);
+      await expect(page.getByText('3 500,5 m²', { exact: true })).toBeVisible();
     } else {
       expect(spec.answers.serviceName).toBe('Trepikodade suurpuhastus');
     }
@@ -736,9 +786,13 @@ test('source service types use conditional questions, clear stale answers and re
     await filter.selectOption(item.formId);
     const cards = page.locator('.procurement-card');
     await expect(cards.filter({ hasText: item.title })).toHaveCount(1);
-    const badges = await cards.locator('.service-badge').allTextContents();
-    expect(badges.length).toBeGreaterThan(0);
-    expect(badges.every((label) => label === item.label)).toBe(true);
+    // Publishing may still be refreshing the list; inspect the settled filtered cards.
+    await expect
+      .poll(async () => {
+        const badges = await cards.locator('.service-badge').allTextContents();
+        return badges.length > 0 && badges.every((label) => label === item.label);
+      })
+      .toBe(true);
     await expectResponsive(page);
   }
   await filter.selectOption('all');
@@ -756,8 +810,8 @@ test('source service types use conditional questions, clear stale answers and re
   await login(page, 'supplier@demo.test');
   await page.goto('/#procurement/' + pest.id);
   await nextAction(page, 'Esita pakkumine');
-  await page.getByLabel('Teenuse tavahind (€)', { exact: true }).fill('1000');
-  await page.getByLabel('Tagatisraha (€)', { exact: true }).fill('100.03');
+  await page.getByLabel('Teenuse tavahind (€)', { exact: true }).fill('1\u202f000,00');
+  await page.getByLabel('Tagatisraha (€)', { exact: true }).fill('100,03');
   await page.getByLabel(/^Osalejate arv(?! 2)/).fill('2');
   await page.getByLabel('Teenuse hind (€)', { exact: true }).fill('900');
   await page.getByLabel('Osalejate arv 2', { exact: true }).fill('3');

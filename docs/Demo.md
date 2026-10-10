@@ -1,0 +1,9 @@
+# Full process screen recording
+
+The recording follows the actual portal in a Chromium browser: public entry, registration and organization approval, CSV preview/import, procurement creation/publication, neighbor map/invitations, supplier tiered offer, buyer selection, three associations joining and making TEST payments, lower achieved pricing, real deadline processing, saved contracts, completion/ratings and administrator ledger/audit inspection.
+
+Run `npm run build`, ensure Compose PostgreSQL is available, then run `node scripts/record-demo.mjs`. Node 24, Playwright Chromium and FFmpeg/ffprobe must be installed. The script creates a uniquely named `uhishange_recording_<timestamp>` database, migrates/seeds it and starts a separate application/worker on localhost:3002. It never resets the main or test databases and records only fictional accounts. All financial operations use the explicitly simulated adapter through the ordinary browser controls.
+
+Outputs are local generated artifacts in recordings/: an H.264 MP4, the original WebM, chapter/timing metadata and verification JSON. A visible DEMO caption and cursor explain roles and stages. Waiting for the joining deadline is shortened in the exported video; the real worker still waits for and processes the original deadline. Service completion/ratings simulate the end of the season and are labeled accordingly. The script closes its browser/application/worker after capture; the isolated recording database remains available for inspection.
+
+The recording is silent and uses Estonian captions. Existing pilot business records are compared before/after. The recorded result must have the expected paid participants, best tier, final contracts, completed services and exact TEST deposit/fee/payout totals, with no browser errors or page overflow. FFprobe and sampled frame inspection verify the final media file. The generated recording is delivered locally rather than added to Git history.

@@ -29,7 +29,7 @@ Financial assertions cover retained deposits including withdrawals, nearest-cent
 
 ## Browser and time scenarios
 
-Six scenarios run on desktop Chromium and a mobile viewport: buyer/supplier/group participation with lower pricing, registration and admin approval/import/retry, contract completion followed by administrator cancellation, withdrawal from a finalized active contract, approved viewers reading invitations, and multi-service creation with pest-control supplier/neighbor participation. They exercise map zoom/selection including colocated organizations, profile editing, invitations, failed payment retry, withdrawal notices, TEST labels and horizontal page overflow.
+Six scenarios run on desktop Chromium (en-US, America/Los_Angeles) and a mobile viewport (en-GB, Asia/Tokyo): buyer/supplier/group participation with lower pricing, registration and admin approval/import/retry, contract completion followed by administrator cancellation, withdrawal from a finalized active contract, approved viewers reading invitations, and multi-service creation with pest-control supplier/neighbor participation. They exercise map zoom/selection including colocated organizations, profile editing, invitations, failed payment retry, withdrawal notices, TEST labels and horizontal page overflow.
 
 The main procurement scenario uses the visible process/next-action panel to publish, find neighbors, compare offers, join and pay. The neighbor demo shortcut opens buyer2's account; the buyer receives and accepts an invitation through the Postkast view before separately confirming participation and TEST payment. The contract scenario reads its finalization message, verifies read state survives logout, and follows the procurement's next action to the contract. Viewer coverage reads a mailbox invitation while confirming that response and joining controls are unavailable. These flows run on desktop and mobile and do not require secondary-tab navigation for the next required task.
 
@@ -40,6 +40,8 @@ The mailbox returns every visible letter in date order. A real-database fixture 
 Browser fixture preparation uses public API operations and the same real durable processor used by the worker. Fixtures establish contract/job starting states; interactions under test use visible portal controls.
 
 Tallinn conversion tests cover winter/summer offsets, midnight crossing, the nonexistent spring hour and the repeated autumn hour. The repeated autumn hour resolves to its earlier UTC instant. Dates round-trip independently of the host timezone.
+
+Regional-format cases use fixed expected Estonian dates, 24-hour Tallinn times, grouped decimal-comma quantities and exact integer-cent conversions. Parser tests reject ambiguous separators, malformed grouping, scientific/hex notation, unsafe values and fractional cents rather than rounding them. Date-only service values remain ISO calendar dates in the API, including leap days. The existing browser flows enter grouped/comma prices, quantities, coordinates and explicit Estonian date text, then check exact API cents/numbers/UTC instants and readable saved dates, quantities, coordinates and contract balances. Both browser projects deliberately use non-Estonian locales and non-Tallinn timezones; CSV machine formatting stays unchanged.
 
 Demo passwords are `Demo2026!`; registration tests use `Demo2026!!` to satisfy the ten-character minimum. The HTTP helper applies every Set-Cookie header in order because login clears an old session before creating a new one.
 

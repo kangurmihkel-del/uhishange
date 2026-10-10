@@ -56,7 +56,23 @@ import type {
   ServiceFormId,
   ProcurementSpec,
 } from '../shared/types';
-import { api, date, euro, localDateTime, utcDateTime } from './api';
+import {
+  api,
+  date,
+  euro,
+  localDateTime,
+  utcDateTime,
+  number as etNumber,
+  coordinate,
+  parseDecimal,
+  parseEuroCents,
+  parseDateTimeInput,
+} from './api';
+import {
+  RegionalNumberInput,
+  RegionalDateInput,
+  normalizeServiceInputAnswers,
+} from './RegionalInputs';
 import {
   SERVICE_FORMS,
   defaultServiceAnswers,
@@ -460,9 +476,9 @@ export default function App() {
                     <span
                       className="nav-unread"
                       aria-hidden="true"
-                      title={unreadCount + ' lugemata kirja'}
+                      title={etNumber(unreadCount) + ' lugemata kirja'}
                     >
-                      {unreadCount}
+                      {etNumber(unreadCount)}
                     </span>
                   )}
                 </a>
@@ -676,7 +692,7 @@ function Auth({ onLogin }: { onLogin: () => Promise<void> }) {
     event.preventDefault();
     const section = document.getElementById(sectionId);
     section?.focus({ preventScroll: true });
-    section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    section?.scrollIntoView({ behavior: 'instant', block: 'start' });
   };
   const startProcurement = () => {
     setRegister(true);
@@ -685,7 +701,7 @@ function Auth({ onLogin }: { onLogin: () => Promise<void> }) {
         '#account-form input[autocomplete="name"]',
       );
       input?.focus({ preventScroll: true });
-      input?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      input?.scrollIntoView({ behavior: 'instant', block: 'center' });
     });
   };
   return (
@@ -951,7 +967,7 @@ function Overview({
           <CommunityHouses />
           <div className="community-summary">
             <div>
-              <strong>{loading ? '…' : error ? '—' : open.length}</strong>
+              <strong>{loading ? '…' : error ? '—' : etNumber(open.length)}</strong>
               <span>avatud ühishanget</span>
             </div>
             <div>
@@ -960,7 +976,7 @@ function Overview({
                   ? '…'
                   : error
                     ? '—'
-                    : rows.reduce((sum, item) => sum + item.activeCount, 0)}
+                    : etNumber(rows.reduce((sum, item) => sum + item.activeCount, 0))}
               </strong>
               <span>makstud liitumist</span>
             </div>
@@ -971,21 +987,21 @@ function Overview({
       <div className="kpi-grid">
         <Metric
           icon={<ClipboardList size={22} />}
-          value={loading ? '…' : String(open.length)}
+          value={loading ? '…' : etNumber(open.length)}
           label="Avatud ühishanget"
           note="Leia oma ühistule sobiv"
           color="teal"
         />
         <Metric
           icon={<Users size={22} />}
-          value={loading ? '…' : String(rows.reduce((sum, item) => sum + item.activeCount, 0))}
+          value={loading ? '…' : etNumber(rows.reduce((sum, item) => sum + item.activeCount, 0))}
           label="Makstud liitumist"
           note="Kinnitatud testmaksed"
           color="blue"
         />
         <Metric
           icon={<CheckCircle2 size={22} />}
-          value={loading ? '…' : String(successful.length)}
+          value={loading ? '…' : etNumber(successful.length)}
           label="Õnnestunud hanget"
           note="Ühine eesmärk saavutatud"
           color="green"
@@ -1116,7 +1132,7 @@ function ProcurementCard({ procurement }: { procurement: Procurement }) {
       <div className="procurement-card-bottom">
         <span>
           <Clock3 size={14} />
-          {remaining > 0 ? `${remaining} päeva liitumiseks` : 'Liitumise tähtaeg möödas'}
+          {remaining > 0 ? `${etNumber(remaining)} päeva liitumiseks` : 'Liitumise tähtaeg möödas'}
         </span>
         <span className="card-arrow">
           <ArrowRight size={18} />
@@ -1251,8 +1267,15 @@ function NewProcurement({
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!organization) return;
-    const submittedAnswers = sanitizeServiceAnswers(formDefinition, answers);
-    const validation = validateServiceAnswers(formDefinition, submittedAnswers);
+    const normalized = normalizeServiceInputAnswers(formDefinition, answers);
+    const submittedAnswers = sanitizeServiceAnswers(formDefinition, normalized.answers);
+    const normalizationErrors = new Set(normalized.issues.map((issue) => issue.fieldId));
+    const validation = [
+      ...normalized.issues,
+      ...validateServiceAnswers(formDefinition, submittedAnswers).filter(
+        (issue) => !normalizationErrors.has(issue.fieldId),
+      ),
+    ];
     setIssues(validation);
     if (validation.length) {
       requestAnimationFrame(() => {
@@ -1272,8 +1295,8 @@ function NewProcurement({
           organizationId: organization.id,
           title: text('title'),
           description: text('description'),
-          radiusM: Number(form.get('radiusM')),
-          joinDeadlineAt: utcDateTime(text('deadline')),
+          radiusM: parseDecimal(String(form.get('radiusM') || '')),
+          joinDeadlineAt: utcDateTime(parseDateTimeInput(text('deadline'))),
           spec: { formId, version: formDefinition.version, answers: submittedAnswers },
         }),
       'Hanke mustand on salvestatud. Avalda see, kui tingimused on valmis.',
@@ -1341,10 +1364,12 @@ function NewProcurement({
             <div className="field-grid">
               <Field
                 label="Liitumise tähtaeg"
+                className="regional-datetime-field"
                 hint="Tallinna aeg. Liitumine jääb avatuks ka pärast õnnestumist."
               >
-                <input
-                  type="datetime-local"
+                <RegionalDateInput
+                  mode="datetime"
+                  calendarLabel="Liitumise tähtaeg"
                   name="deadline"
                   defaultValue={localDateTime(new Date(Date.now() + 7 * 86_400_000))}
                   min={localDateTime(new Date(Date.now() + 60_000))}
@@ -1352,13 +1377,13 @@ function NewProcurement({
                 />
               </Field>
               <Field label="Kutsete raadius (m)" hint="Kaugus sinu organisatsiooni aadressist.">
-                <input
+                <RegionalNumberInput
                   name="radiusM"
-                  type="number"
                   defaultValue={500}
                   min={50}
                   max={10000}
                   step={1}
+                  decimalPlaces={0}
                   required
                 />
               </Field>
@@ -1410,7 +1435,7 @@ function NewProcurement({
               <strong>Hanke keskpunkt</strong>
               <span>{organization.address}</span>
               <small>
-                {organization.latitude.toFixed(5)}, {organization.longitude.toFixed(5)}
+                {coordinate(organization.latitude)}; {coordinate(organization.longitude)}
               </small>
             </div>
           </div>
@@ -1522,7 +1547,7 @@ function ProcurementPage({
                   ? 'Eesmärk saavutatud. Liitumine kestab tähtajani; uued liitujad võivad tuua soodsama hinnataseme.'
                   : 'Hange õnnestus. Liitumise tähtaeg on möödunud; saavutatud hind säilib.'
               : open
-                ? `Õnnestumiseks on vaja veel ${Math.max(0, threshold - procurement.activeCount)} makstud liitumist.`
+                ? `Õnnestumiseks on vaja veel ${etNumber(Math.max(0, threshold - procurement.activeCount))} makstud liitumist.`
                 : 'Liitumise tähtaeg on möödunud. Hanke tulemus ja TEST tagatiste arvestus selguvad tähtaja töötlemisel.';
   return (
     <>
@@ -1544,7 +1569,9 @@ function ProcurementPage({
             {procurement.organizationName}
             <span className="separator-dot">·</span>
             <Clock3 size={15} />
-            Liitumine {date(procurement.joinDeadlineAt, true)}-ni
+            <time dateTime={procurement.joinDeadlineAt}>
+              Liitumine {date(procurement.joinDeadlineAt, true)}-ni
+            </time>
           </p>
         </div>
       </div>
@@ -1597,9 +1624,9 @@ function ProcurementPage({
       <div className="detail-tabs" role="group" aria-label="Hanke vaade">
         {[
           ['overview', 'Ülevaade'],
-          ['offers', `Pakkumised (${offers.length})`],
-          ['neighbors', `Naabrid ja kutsed (${nearby.length})`],
-          ['participants', `Minu liitumised (${commitments.length})`],
+          ['offers', `Pakkumised (${etNumber(offers.length)})`],
+          ['neighbors', `Naabrid ja kutsed (${etNumber(nearby.length)})`],
+          ['participants', `Minu liitumised (${etNumber(commitments.length)})`],
         ].map(([value, label]) => (
           <button
             key={value}
@@ -1745,7 +1772,9 @@ function ProcurementPage({
                           <strong>{neighbor.name}</strong>
                           <small>{neighbor.address}</small>
                         </div>
-                        <span className="distance">{Math.round(neighbor.distanceM)} m</span>
+                        <span className="distance">
+                          {etNumber(Math.round(neighbor.distanceM))} m
+                        </span>
                         {invite ? (
                           <Status status={invite.status} />
                         ) : (
@@ -1948,7 +1977,7 @@ function OfferCard({
             key={tier.minParticipants}
           >
             <span>
-              {tier.minParticipants}+ ühistut
+              {etNumber(tier.minParticipants)}+ ühistut
               {index === 0 && <span className="tier-goal">EESMÄRK</span>}
             </span>
             <strong>{euro(tier.priceCents)}</strong>
@@ -1997,13 +2026,13 @@ function OfferForm({
       () =>
         api(`/procurements/${procurement.id}/offers`, {
           organizationId: organization.id,
-          basePriceCents: Math.round(Number(form.get('basePrice')) * 100),
-          depositCents: Math.round(Number(form.get('deposit')) * 100),
+          basePriceCents: parseEuroCents(String(form.get('basePrice') || '')),
+          depositCents: parseEuroCents(String(form.get('deposit') || '')),
           terms: String(form.get('terms')),
-          validUntil: utcDateTime(String(form.get('validUntil'))),
+          validUntil: utcDateTime(parseDateTimeInput(String(form.get('validUntil') || ''))),
           tiers: tiers.map((tier) => ({
-            minParticipants: Number(tier.participants),
-            priceCents: Math.round(Number(tier.price) * 100),
+            minParticipants: parseDecimal(tier.participants),
+            priceCents: parseEuroCents(tier.price),
           })),
         }),
       'Pakkumine on esitatud.',
@@ -2036,15 +2065,32 @@ function OfferForm({
                 isSnowService(procurement.spec) ? 'Hooaja tavahind (€)' : 'Teenuse tavahind (€)'
               }
             >
-              <input name="basePrice" type="number" step="0.01" min="0.01" required />
+              <RegionalNumberInput
+                name="basePrice"
+                step="0.01"
+                decimalPlaces={2}
+                min="0.01"
+                required
+              />
             </Field>
             <Field label="Tagatisraha (€)">
-              <input name="deposit" type="number" step="0.01" min="0.01" required />
+              <RegionalNumberInput
+                name="deposit"
+                step="0.01"
+                decimalPlaces={2}
+                min="0.01"
+                required
+              />
             </Field>
-            <Field label="Pakkumise kehtivus" hint="Tallinna aeg.">
-              <input
+            <Field
+              label="Pakkumise kehtivus"
+              className="regional-datetime-field"
+              hint="Tallinna aeg."
+            >
+              <RegionalDateInput
                 name="validUntil"
-                type="datetime-local"
+                calendarLabel="Pakkumise kehtivus"
+                mode="datetime"
                 defaultValue={localDateTime(new Date(procurement.joinDeadlineAt))}
                 required
               />
@@ -2058,19 +2104,17 @@ function OfferForm({
                   label={`Osalejate arv${index ? ` ${index + 1}` : ''}`}
                   hint={index === 0 ? 'Hanke õnnestumise lävend.' : undefined}
                 >
-                  <input
-                    type="number"
+                  <RegionalNumberInput
                     min={1}
                     max={1000}
                     step={1}
+                    decimalPlaces={0}
                     required
                     value={tier.participants}
-                    onChange={(event) =>
+                    onValueChange={(raw) =>
                       setTiers(
                         tiers.map((item, itemIndex) =>
-                          itemIndex === index
-                            ? { ...item, participants: event.target.value }
-                            : item,
+                          itemIndex === index ? { ...item, participants: raw } : item,
                         ),
                       )
                     }
@@ -2079,16 +2123,16 @@ function OfferForm({
                 <Field
                   label={`${isSnowService(procurement.spec) ? 'Hooaja' : 'Teenuse'} hind (€)${index ? ` ${index + 1}` : ''}`}
                 >
-                  <input
-                    type="number"
+                  <RegionalNumberInput
                     min="0.01"
                     step="0.01"
+                    decimalPlaces={2}
                     required
                     value={tier.price}
-                    onChange={(event) =>
+                    onValueChange={(raw) =>
                       setTiers(
                         tiers.map((item, itemIndex) =>
-                          itemIndex === index ? { ...item, price: event.target.value } : item,
+                          itemIndex === index ? { ...item, price: raw } : item,
                         ),
                       )
                     }
@@ -2346,7 +2390,7 @@ function JoinPanel({
       ) : (
         <p>
           {open
-            ? `Sinu ühistu asub väljaspool selle hanke ${procurement.radiusM} meetri kutseraadiust.`
+            ? `Sinu ühistu asub väljaspool selle hanke ${etNumber(procurement.radiusM)} meetri kutseraadiust.`
             : 'Selle hanke liitumise tähtaeg on möödas või hange ei ole avatud.'}
         </p>
       )}
@@ -2407,7 +2451,7 @@ function CoordinateMap({
       <svg
         viewBox="0 0 520 380"
         role="img"
-        aria-label={`Hanke keskpunkt ja läheduses olevad ühistud, kutseraadius ${procurement.radiusM} meetrit`}
+        aria-label={`Hanke keskpunkt ja läheduses olevad ühistud, kutseraadius ${etNumber(procurement.radiusM)} meetrit`}
       >
         <defs>
           <pattern id="map-grid" width="40" height="40" patternUnits="userSpaceOnUse">
@@ -2439,7 +2483,7 @@ function CoordinateMap({
                 key={item.id}
                 role="button"
                 tabIndex={0}
-                aria-label={`${item.name}, ${Math.round(item.distanceM)} meetrit`}
+                aria-label={`${item.name}, ${etNumber(Math.round(item.distanceM))} meetrit`}
                 aria-pressed={selected === item.id}
                 className="map-point"
                 onClick={() => setSelected(item.id)}
@@ -2451,7 +2495,7 @@ function CoordinateMap({
                 }}
               >
                 <title>
-                  {item.name} · {Math.round(item.distanceM)} m
+                  {item.name} · {etNumber(Math.round(item.distanceM))} m
                 </title>
                 <circle
                   cx={p.x}
@@ -2488,7 +2532,7 @@ function CoordinateMap({
           />
         </g>
         <text x="22" y="352" fill="var(--muted)" fontSize="10">
-          {Math.round(radius)} m skaalaraadius
+          {etNumber(Math.round(radius))} m skaalaraadius
         </text>
         <text x="480" y="30" fill="var(--forest)" fontSize="12" fontWeight="700">
           N ↑
@@ -2497,14 +2541,14 @@ function CoordinateMap({
       <div className="map-bottom">
         {neighbor ? (
           <span>
-            <strong>{neighbor.name}</strong> · {Math.round(neighbor.distanceM)} m
+            <strong>{neighbor.name}</strong> · {etNumber(Math.round(neighbor.distanceM))} m
           </span>
         ) : (
           <span>Vali kaardil ühistu, et vaadata kaugust.</span>
         )}
         <small>
-          Suur roheline tähis: hanke algataja. Kutseraadius {procurement.radiusM} m. Lähestikku
-          tähised on nihutatud.
+          Suur roheline tähis: hanke algataja. Kutseraadius {etNumber(procurement.radiusM)} m.
+          Lähestikku tähised on nihutatud.
         </small>
       </div>
     </div>
@@ -2568,7 +2612,7 @@ function Invitations({ revision, session }: { revision: number; session: Session
                       <MapPin size={14} />
                       {invitation.distanceM === null
                         ? 'Kutsel kaugus määramata'
-                        : `${Math.round(invitation.distanceM)} m hanke algatajast`}
+                        : `${etNumber(Math.round(invitation.distanceM))} m hanke algatajast`}
                       <span>·</span>
                       {date(invitation.createdAt)}
                     </p>
@@ -2856,8 +2900,8 @@ function Organizations({ session, revision }: { session: SessionResponse; revisi
           name: String(form.get('name')),
           orgType: String(form.get('orgType')),
           address: String(form.get('address')),
-          latitude: Number(form.get('latitude')),
-          longitude: Number(form.get('longitude')),
+          latitude: parseDecimal(String(form.get('latitude') || '')),
+          longitude: parseDecimal(String(form.get('longitude') || '')),
           email: String(form.get('email') || ''),
         }),
       'Organisatsioon on lisatud. Esindusõigus ootab administraatori kinnitust.',
@@ -2914,8 +2958,8 @@ function Organizations({ session, revision }: { session: SessionResponse; revisi
                   <div>
                     <dt>Koordinaadid</dt>
                     <dd>
-                      {membership.organization.latitude.toFixed(5)},{' '}
-                      {membership.organization.longitude.toFixed(5)}
+                      {coordinate(membership.organization.latitude)};{' '}
+                      {coordinate(membership.organization.longitude)}
                     </dd>
                   </div>
                   {membership.organization.email && (
@@ -3054,10 +3098,10 @@ function Organizations({ session, revision }: { session: SessionResponse; revisi
                 <input name="address" minLength={3} required />
               </Field>
               <Field label="Laiuskraad (WGS84)">
-                <input
+                <RegionalNumberInput
                   name="latitude"
-                  type="number"
                   step="0.000001"
+                  decimalPlaces={6}
                   min={-90}
                   max={90}
                   defaultValue={59.405}
@@ -3065,10 +3109,10 @@ function Organizations({ session, revision }: { session: SessionResponse; revisi
                 />
               </Field>
               <Field label="Pikkuskraad (WGS84)">
-                <input
+                <RegionalNumberInput
                   name="longitude"
-                  type="number"
                   step="0.000001"
+                  decimalPlaces={6}
                   min={-180}
                   max={180}
                   defaultValue={24.69}
@@ -3109,8 +3153,8 @@ function OrganizationEditor({ organization }: { organization: Organization }) {
           {
             name: String(form.get('name')),
             address: String(form.get('address')),
-            latitude: Number(form.get('latitude')),
-            longitude: Number(form.get('longitude')),
+            latitude: parseDecimal(String(form.get('latitude') || '')),
+            longitude: parseDecimal(String(form.get('longitude') || '')),
             email: String(form.get('email') || ''),
           },
           'PUT',
@@ -3138,10 +3182,10 @@ function OrganizationEditor({ organization }: { organization: Organization }) {
           <input name="address" defaultValue={organization.address} maxLength={500} required />
         </Field>
         <Field label="Laiuskraad (WGS84)">
-          <input
+          <RegionalNumberInput
             name="latitude"
-            type="number"
             step="0.000001"
+            decimalPlaces={6}
             min={-90}
             max={90}
             defaultValue={organization.latitude}
@@ -3149,10 +3193,10 @@ function OrganizationEditor({ organization }: { organization: Organization }) {
           />
         </Field>
         <Field label="Pikkuskraad (WGS84)">
-          <input
+          <RegionalNumberInput
             name="longitude"
-            type="number"
             step="0.000001"
+            decimalPlaces={6}
             min={-180}
             max={180}
             defaultValue={organization.longitude}
@@ -3223,7 +3267,7 @@ function Administration({ revision }: { revision: number }) {
       </div>
       <div className="detail-tabs admin-tabs" role="group" aria-label="Halduse vaade">
         {[
-          ['memberships', `Esindusõigused (${pending.length})`],
+          ['memberships', `Esindusõigused (${etNumber(pending.length)})`],
           ['import', 'CSV import'],
           ['ledger', 'TEST pearaamat'],
           ['audit', 'Auditilogi'],
@@ -3383,7 +3427,7 @@ function Administration({ revision }: { revision: number }) {
                 </div>
                 {preview && (
                   <div className="import-preview">
-                    <h3>Eelvaade: {preview.rows.length} organisatsiooni</h3>
+                    <h3>Eelvaade: {etNumber(preview.rows.length)} organisatsiooni</h3>
                     {preview.errors.length > 0 ? (
                       <div role="alert" className="validation-errors">
                         <strong>Import on peatatud. Paranda kõik vead:</strong>
@@ -3422,7 +3466,7 @@ function Administration({ revision }: { revision: number }) {
                               <td>{row.orgType === 'BUYER' ? 'Ühistu' : 'Pakkuja'}</td>
                               <td>{row.address}</td>
                               <td>
-                                {row.latitude}, {row.longitude}
+                                {coordinate(row.latitude)}; {coordinate(row.longitude)}
                               </td>
                             </tr>
                           ))}
@@ -3537,7 +3581,7 @@ function Administration({ revision }: { revision: number }) {
                               ?.title || job.kind}
                           </strong>
                           <small>
-                            {date(job.dueAt, true)} · {job.attempts} katset
+                            {date(job.dueAt, true)} · {etNumber(job.attempts)} katset
                           </small>
                           {job.lastError && <small className="job-error">{job.lastError}</small>}
                         </div>

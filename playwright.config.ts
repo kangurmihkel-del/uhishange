@@ -17,8 +17,19 @@ export default defineConfig({
     screenshot: 'only-on-failure',
   },
   projects: [
-    { name: 'desktop', use: { ...devices['Desktop Chrome'] } },
-    { name: 'mobile', use: { ...devices['iPhone 13'], defaultBrowserType: 'chromium' } },
+    {
+      name: 'desktop',
+      use: { ...devices['Desktop Chrome'], locale: 'en-US', timezoneId: 'America/Los_Angeles' },
+    },
+    {
+      name: 'mobile',
+      use: {
+        ...devices['iPhone 13'],
+        defaultBrowserType: 'chromium',
+        locale: 'en-GB',
+        timezoneId: 'Asia/Tokyo',
+      },
+    },
   ],
   webServer: {
     command: 'npm run bootstrap && npm run build && node dist/server/server/server.js',

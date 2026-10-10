@@ -5,6 +5,7 @@ dist
 coverage
 playwright-report
 test-results
+recordings/
 *.docx
 *.jpg
 *.png

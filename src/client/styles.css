@@ -3607,3 +3607,46 @@ small.join-deposit {
     gap: 6px;
   }
 }
+
+/* Explicit Estonian date entry with an optional native calendar picker. */
+.regional-date-input {
+  position: relative;
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  min-width: 0;
+}
+.regional-date-text {
+  flex: 1;
+  min-width: 0;
+}
+.regional-calendar-button {
+  display: grid;
+  place-items: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--control-line);
+  border-radius: 8px;
+  background: var(--surface-soft);
+  color: var(--forest);
+}
+.regional-calendar-button:hover {
+  background: var(--sage-surface);
+}
+.regional-native-picker {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  opacity: 0;
+  pointer-events: none;
+}
+@media (max-width: 650px) {
+  .field-grid .regional-datetime-field {
+    grid-column: 1 / -1;
+  }
+}

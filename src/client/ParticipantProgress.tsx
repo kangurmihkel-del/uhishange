@@ -1,3 +1,5 @@
+import { number } from './api';
+
 export default function ParticipantProgress({
   paidCount,
   threshold,
@@ -34,7 +36,9 @@ export default function ParticipantProgress({
         aria-valuemin={target ? 0 : undefined}
         aria-valuemax={target}
         aria-valuenow={target ? Math.min(count, target) : undefined}
-        aria-valuetext={target ? count + ' / ' + target + ' makstud liitumist' : undefined}
+        aria-valuetext={
+          target ? number(count) + ' / ' + number(target) + ' makstud liitumist' : undefined
+        }
         aria-hidden={!target ? true : undefined}
       >
         {Array.from({ length: dotCount }, (_, index) => (
@@ -48,10 +52,10 @@ export default function ParticipantProgress({
         ))}
       </div>
       <div className="participant-count">
-        <strong>{count} makstud liitumist</strong>
+        <strong>{number(count)} makstud liitumist</strong>
         {target && (
           <span>
-            {count} / {target} liitunud
+            {number(count)} / {number(target)} liitunud
           </span>
         )}
       </div>

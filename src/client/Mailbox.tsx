@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, Check, Mail, MailOpen } from 'lucide-react';
 import type { MailboxMessage, MailboxResponse, SessionResponse } from '../shared/types';
-import { api, date } from './api';
+import { api, date, number } from './api';
 
 type Run = <T>(
   action: () => Promise<T>,
@@ -102,7 +102,7 @@ export default function Mailbox({
           <p>Rakendusesisesed kirjad sinu organisatsioonidele. E-kirju ei saadeta.</p>
         </div>
         <span className="mailbox-count" role="status">
-          {inbox?.unreadCount ?? 0} lugemata
+          {number(inbox?.unreadCount ?? 0)} lugemata
         </span>
       </div>
       {error && (
@@ -219,7 +219,7 @@ export default function Mailbox({
                         : 'tagasi lükatud'}
                   </strong>
                   {invitation.distanceM !== null && (
-                    <p>Kaugus algatajast: {Math.round(invitation.distanceM)} m.</p>
+                    <p>Kaugus algatajast: {number(Math.round(invitation.distanceM))} m.</p>
                   )}
                   {invitation.status === 'PENDING' && mayRespond && (
                     <div className="mailbox-message-actions">
