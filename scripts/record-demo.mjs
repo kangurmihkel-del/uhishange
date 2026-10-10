@@ -553,6 +553,8 @@ try {
   await snapshot('contract');
   const finalSummary = contract.getByText('Lepingu lõplik tingimuste koopia', { exact: true });
   await click(finalSummary);
+  await expect(contract.getByTestId('contract-service-fee')).toContainText(/10\s*€/);
+  await expect(contract.getByTestId('supplier-deposit-payout')).toContainText(/90\s*€/);
   await reveal(contract.getByTestId('agreement-history'));
   await snapshot('final-snapshot');
   await click(finalSummary);
@@ -572,7 +574,7 @@ try {
 
   await stage(
     'Administraator kontrollib TEST pearaamatut',
-    'Kolm testtagatist: kokku 300 €. Platvormi 4% tasu on 12 € ja pakkuja 96% osa 288 €.',
+    'Kolm testtagatist: kokku 300 €. Teenustasu on 10% tagatisest: kokku 30 €. Pakkujale tagatistest 270 €.',
   );
   await login('admin@demo.test', 'Administraator');
   await navigate('Haldus');
@@ -609,7 +611,7 @@ try {
     [procurementId],
   );
   const { rows: contracts } = await recording.query(
-    'SELECT status,price_cents,deposit_credit_cents,balance_cents,rating FROM contracts WHERE procurement_id=$1',
+    "SELECT status,price_cents,deposit_credit_cents,balance_cents,rating,(final_snapshot->>'serviceFeeCents')::integer AS service_fee_cents,(final_snapshot->>'supplierPayoutCents')::integer AS supplier_payout_cents FROM contracts WHERE procurement_id=$1",
     [procurementId],
   );
   const { rows: ledger } = await recording.query(
@@ -632,13 +634,15 @@ try {
         row.price_cents === 70000 &&
         row.deposit_credit_cents === 10000 &&
         row.balance_cents === 60000 &&
+        row.service_fee_cents === 1000 &&
+        row.supplier_payout_cents === 9000 &&
         row.rating === 5,
     ),
   );
   assert.deepEqual(ledger, [
     { kind: 'DEPOSIT', count: 3, cents: 30000, all_test: true },
-    { kind: 'PLATFORM_FEE', count: 3, cents: 1200, all_test: true },
-    { kind: 'SUPPLIER_PAYOUT', count: 3, cents: 28800, all_test: true },
+    { kind: 'PLATFORM_FEE', count: 3, cents: 3000, all_test: true },
+    { kind: 'SUPPLIER_PAYOUT', count: 3, cents: 27000, all_test: true },
   ]);
   const after = await businessFingerprint();
   assert.deepEqual(after, before, 'Main pilot business records changed during recording');
@@ -768,7 +772,7 @@ try {
     .join('\n');
   await writeFile(
     resolve(output, 'README.md'),
-    `# Ühishange process recording\n\nThe MP4 records the real local portal with fictional organizations and TEST payments. Silent Estonian captions identify each role. Deadline waiting is shortened; season completion is explicitly simulated.\n\n${chapterList}\n\nIsolated database: ${databaseName}. Main pilot business records remained unchanged. verification.json records assertions and media checks.\n`,
+    `# Ühishange process recording\n\nThe MP4 records the real local portal with fictional organizations and TEST payments. Silent Estonian captions identify each role. Deadline waiting is shortened; season completion is explicitly simulated. The supplier fee is 10% of each gross deposit, with no minimum and independent of final service price: three EUR 100 deposits yield EUR 30 of TEST fees and EUR 270 of supplier deposit payouts.\n\n${chapterList}\n\nIsolated database: ${databaseName}. Main pilot business records remained unchanged. verification.json records assertions and media checks.\n`,
   );
   console.log('DEMO COMPLETE: ' + resolve(output, 'uhishange-full-process.mp4'));
 } catch (error) {

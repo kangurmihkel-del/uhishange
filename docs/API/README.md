@@ -63,4 +63,12 @@ All administration routes require platform-administrator authority. Contacts, ac
 
 This pilot exposes a simulated provider operation, not a production PSP webhook. Captures are unique per commitment payment; event replays cannot double-charge or double-count. Failed attempts can be retried. Late captures produce an equal refund. Ledger entries record deposits, refunds, platform fees, supplier payouts and compensating reversals without editing previous entries. Contracts preserve finalSnapshot separately from acceptanceSnapshot.
 
-Acceptance and final agreement snapshots have explicit shared TypeScript contracts. Their JSON shape is unchanged: acceptance retains acceptedAt and confirmations; final contracts retain finalizedAt, finalPriceCents, depositCreditCents and remainingInvoiceCents. Product history formats stored values in Estonian and Europe/Tallinn without changing or reloading parties from current profiles.
+Acceptance and final agreement snapshots have explicit shared TypeScript contracts. Acceptance retains acceptedAt and confirmations; final contracts retain finalizedAt, finalPriceCents, depositCreditCents and remainingInvoiceCents. Product history formats stored values in Estonian and Europe/Tallinn without changing or reloading parties from current profiles.
+
+## Versioned service fee
+
+Procurement responses expose feePolicy for prospective pricing: current policy for unfrozen groups, the frozen policy for accepted groups. New agreement snapshots add optional feePolicy with version deposit-v1, basisPoints 1000 and minimumCents 0. Newly created final snapshots additionally preserve serviceFeeCents and supplierPayoutCents. These are additive fields; old snapshots remain unchanged. A missing feePolicy means legacy deposit-v1 using the snapshot's feeBasisPoints and no minimum. Previously accepted contract-price-v1 policies retain their stored percentage and minimum.
+
+The new fee is supplier-paid 10% of the retained deposit, with no minimum, independent of final service price or achieved participant tier. It is a gross fee including VAT if applicable; the buyer's service price and full deposit credit are unchanged. Post-success retained withdrawals use the frozen deposit percentage. Refunds, idempotency and exact cancellation reversal remain as documented above.
+
+For newly submitted offers under the deposit policy, depositCents must be positive and no greater than the cheapest tier price; no contract-price fee coverage check applies. Frozen contract-price-v1 agreements retain their original coverage and allocation rules. See [ADR 0006](../ADR/0006-deposit-service-fee.md).

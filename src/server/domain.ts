@@ -12,7 +12,11 @@ import { pool, transaction } from './db.js';
 import { messagesFromAudit } from './mailbox.js';
 import { assert, DomainError } from './errors.js';
 import { organizationView } from './views.js';
-import { PLATFORM_FEE_BASIS_POINTS } from '../shared/constants.js';
+import {
+  calculatePlatformFee,
+  CURRENT_FEE_POLICY,
+  feePolicyForSnapshot,
+} from '../shared/pricing.js';
 
 export interface ProcurementRow {
   id: string;
@@ -168,6 +172,19 @@ export async function createCommitment(
       'OFFER_EXPIRED',
       'Valitud pakkumine on aegunud.',
     );
+    assert(
+      p.frozen_snapshot ||
+        offer.deposit_cents >=
+          calculatePlatformFee(
+            CURRENT_FEE_POLICY.version === 'contract-price-v1'
+              ? offer.tiers[0].priceCents
+              : offer.deposit_cents,
+            CURRENT_FEE_POLICY,
+          ),
+      409,
+      'DEPOSIT_FEE_COVERAGE',
+      'Valitud pakkumise tagatisraha ei kata portaali teenustasu. Pakkuja peab enne liitumist pakkumist uuendama.',
+    );
     const profiles = await client.query('SELECT * FROM organizations WHERE id=ANY($1::uuid[])', [
       [p.organization_id, offer.organization_id, organizationId],
     ]);
@@ -188,7 +205,8 @@ export async function createCommitment(
       depositCents: offer.deposit_cents,
       tiers: offer.tiers,
       terms: offer.terms,
-      feeBasisPoints: PLATFORM_FEE_BASIS_POINTS,
+      feeBasisPoints: CURRENT_FEE_POLICY.basisPoints,
+      feePolicy: { ...CURRENT_FEE_POLICY },
       currency: 'EUR',
       paymentMode: 'TEST',
     };
@@ -395,7 +413,13 @@ async function finalizeLocked(client: PoolClient, p: ProcurementRow): Promise<bo
   const snapshot = p.frozen_snapshot!;
   const supplier = snapshot.supplierOrganizationId;
   const price = p.best_price_cents!;
+  const policy = feePolicyForSnapshot(snapshot);
   for (const c of commitments) {
+    const continuingBuyer = c.status === 'ACTIVE' || c.status === 'CONTRACTED';
+    const fee =
+      continuingBuyer && policy.version === 'contract-price-v1'
+        ? calculatePlatformFee(price, policy)
+        : calculatePlatformFee(c.deposit_cents, { ...policy, minimumCents: 0 });
     if (c.status === 'ACTIVE' && c.captured_at && !c.refunded_at) {
       const final: FinalContractSnapshot = {
         ...snapshot,
@@ -405,6 +429,8 @@ async function finalizeLocked(client: PoolClient, p: ProcurementRow): Promise<bo
         finalPriceCents: price,
         depositCreditCents: c.deposit_cents,
         remainingInvoiceCents: price - c.deposit_cents,
+        serviceFeeCents: fee,
+        supplierPayoutCents: c.deposit_cents - fee,
         finalizedAt: (await databaseNow(client)).toISOString(),
       };
       await client.query(
@@ -427,7 +453,12 @@ async function finalizeLocked(client: PoolClient, p: ProcurementRow): Promise<bo
       !c.refunded_at &&
       ['ACTIVE', 'WITHDRAWN', 'CONTRACTED'].includes(c.status)
     ) {
-      const fee = Math.floor((c.deposit_cents * PLATFORM_FEE_BASIS_POINTS + 5000) / 10000);
+      assert(
+        c.deposit_cents >= fee,
+        409,
+        'DEPOSIT_FEE_COVERAGE',
+        'Tagatisraha ei kata külmutatud portaali teenustasu.',
+      );
       await ledger(client, p, c, 'PLATFORM_FEE', fee, null);
       await ledger(client, p, c, 'SUPPLIER_PAYOUT', c.deposit_cents - fee, supplier);
     }

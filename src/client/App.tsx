@@ -89,6 +89,8 @@ import Mailbox from './Mailbox';
 import ProcurementFlow, { type FlowTarget } from './ProcurementFlow';
 import Brand, { BrandMark, CommunityHouses } from './Brand';
 import ParticipantProgress from './ParticipantProgress';
+import { CURRENT_FEE_POLICY, feePolicyForSnapshot } from '../shared/pricing';
+import FeeTerms, { SupplierFeePreview, feeAmounts, feePolicyText } from './FeeTerms';
 
 const serviceId = (spec: ProcurementSpec) => ('formId' in spec ? spec.formId : 'snow');
 const communitySteps = [
@@ -1652,7 +1654,13 @@ function ProcurementPage({
                 </p>
               </section>
               {selected ? (
-                <OfferCard offer={selected} selected procurement={procurement} canSelect={false} />
+                <OfferCard
+                  offer={selected}
+                  selected
+                  procurement={procurement}
+                  canSelect={false}
+                  showSupplierAmounts={organization?.id === selected.organizationId}
+                />
               ) : (
                 <section className="card">
                   <Empty
@@ -1715,6 +1723,7 @@ function ProcurementPage({
                     selected={offer.id === selected?.id}
                     procurement={procurement}
                     canSelect={own && open && !procurement.frozenAt}
+                    showSupplierAmounts={organization?.id === offer.organizationId}
                   />
                 ))
               ) : (
@@ -1898,8 +1907,14 @@ function ProcurementPage({
               ühistute hind ei tõuse.
             </p>
             <p>
-              <strong>Tähtajal:</strong> õnnestunud hanke tagatisest läheb 4% platvormile ja 96%
-              teenusepakkujale. Kogu tagatis arvestatakse teenuse hinna sisse.
+              <strong>Tähtajal:</strong> õnnestunud hankele luuakse lepingud. Teenusepakkuja
+              teenustasu arvestatakse tagatisest ja ülejäänud tagatis kantakse talle.
+            </p>
+            <FeeTerms policy={procurement.feePolicy} />
+            <p>
+              <strong>Loobumine enne lepingu loomist:</strong> pärast õnnestumist allesjäetud
+              tagatisest on teenustasu {etNumber(procurement.feePolicy.basisPoints / 100)}%,
+              miinimumtasuta.
             </p>
           </section>
         </aside>
@@ -1922,13 +1937,16 @@ function OfferCard({
   selected,
   procurement,
   canSelect,
+  showSupplierAmounts,
 }: {
   offer: Offer;
   selected: boolean;
   procurement: Procurement;
   canSelect: boolean;
+  showSupplierAmounts: boolean;
 }) {
   const { run } = useOperations();
+  const policy = selected ? procurement.feePolicy : CURRENT_FEE_POLICY;
   return (
     <section className={`card offer-card ${selected ? 'selected-offer' : ''}`}>
       <div className="offer-header">
@@ -1989,8 +2007,12 @@ function OfferCard({
         <span>
           Testtagatisraha <strong>{euro(offer.depositCents)}</strong>
         </span>
-        <span>4% platvormitasu tagatisest</span>
+        <span>Teenusepakkuja teenustasu: {feePolicyText(policy)}</span>
       </div>
+      <FeeTerms policy={policy} />
+      {showSupplierAmounts && (
+        <SupplierFeePreview tiers={offer.tiers} depositCents={offer.depositCents} policy={policy} />
+      )}
       <details className="offer-terms">
         <summary>
           Pakkumise tingimused <ChevronDown size={16} />
@@ -2018,6 +2040,30 @@ function OfferForm({
     { participants: '3', price: '' },
     { participants: '5', price: '' },
   ]);
+  const [deposit, setDeposit] = useState('');
+  const previewCents = (raw: string) => {
+    try {
+      const cents = parseEuroCents(raw);
+      return cents > 0 ? cents : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+  const previewTiers = tiers.flatMap((tier) => {
+    const priceCents = previewCents(tier.price);
+    if (priceCents === undefined) return [];
+    let minParticipants;
+    try {
+      const parsed = parseDecimal(tier.participants);
+      if (Number.isInteger(parsed) && parsed > 0) minParticipants = parsed;
+    } catch {
+      // Price estimates remain available while the participant threshold is being edited.
+    }
+    return [{ priceCents, minParticipants }];
+  });
+  const cheapestPrice = previewTiers.length
+    ? Math.min(...previewTiers.map((tier) => tier.priceCents))
+    : undefined;
   const { run } = useOperations();
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
@@ -2056,7 +2102,7 @@ function OfferForm({
             <span>
               Hinnad on ühe ühistu {isSnowService(procurement.spec) ? 'hooaja' : 'kogu teenuse'}{' '}
               brutohinnad. Osalejate arv peab kasvama ja hinnad saavad ainult langeda. Tagatis ei
-              või ületada odavaimat hinnataset.
+              või ületada odavaimat hinnataset. Teenustasu arvestatakse tagatisest.
             </span>
           </div>
           <div className="field-grid">
@@ -2073,12 +2119,17 @@ function OfferForm({
                 required
               />
             </Field>
-            <Field label="Tagatisraha (€)">
+            <Field
+              label="Tagatisraha (€)"
+              hint={`${etNumber(CURRENT_FEE_POLICY.basisPoints / 100)}% tagatisest on portaali teenustasu.`}
+            >
               <RegionalNumberInput
                 name="deposit"
                 step="0.01"
                 decimalPlaces={2}
                 min="0.01"
+                value={deposit}
+                onValueChange={setDeposit}
                 required
               />
             </Field>
@@ -2096,6 +2147,17 @@ function OfferForm({
               />
             </Field>
           </div>
+          <FeeTerms policy={CURRENT_FEE_POLICY} />
+          <p className="deposit-coverage-note" data-testid="deposit-coverage-note">
+            Teenustasu ei sõltu teenuse lõpphinnast ega hinnatasemest.
+            {cheapestPrice !== undefined && ` Tagatis võib olla kuni ${euro(cheapestPrice)}.`}
+          </p>
+          <SupplierFeePreview
+            tiers={previewTiers}
+            depositCents={previewCents(deposit)}
+            policy={CURRENT_FEE_POLICY}
+            live
+          />
           <div className="tier-editor">
             <h4>Hinnatasemed</h4>
             {tiers.map((tier, index) => (
@@ -2349,6 +2411,7 @@ function JoinPanel({
             arvestatakse täies ulatuses {isSnowService(procurement.spec) ? 'hooaja' : 'teenuse'}{' '}
             tasu sisse.
           </p>
+          <FeeTerms policy={procurement.feePolicy} />
           <label className="checkbox block-checkbox">
             <input
               type="checkbox"
@@ -2735,6 +2798,11 @@ function ContractCard({ contract, canComplete }: { contract: Contract; canComple
   const [withdrawing, setWithdrawing] = useState(false);
   const [rating, setRating] = useState(5);
   const { run } = useOperations();
+  const estimatedAmounts = feeAmounts(
+    contract.priceCents,
+    contract.depositCreditCents,
+    feePolicyForSnapshot(contract.finalSnapshot),
+  );
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const form = new FormData(event.currentTarget);
@@ -2787,6 +2855,15 @@ function ContractCard({ contract, canComplete }: { contract: Contract; canComple
           value={euro(contract.balanceCents)}
         />
       </div>
+      <p className="contract-fee-summary">
+        TESTARVESTUS · Teenusepakkuja teenustasu{' '}
+        <strong>{euro(contract.finalSnapshot.serviceFeeCents ?? estimatedAmounts.fee)}</strong> ·
+        Teenusepakkujale tagatisest{' '}
+        <strong>
+          {euro(contract.finalSnapshot.supplierPayoutCents ?? estimatedAmounts.payout)}
+        </strong>
+        . Ühistule lisatasu ei lisandu.
+      </p>
       <p className="contract-invoice">
         <Euro size={16} />
         {contract.status === 'CANCELLED'

@@ -11,6 +11,7 @@ import type {
   NearbyOrganization,
 } from '../shared/types.js';
 import { pool } from './db.js';
+import { CURRENT_FEE_POLICY, feePolicyForSnapshot } from '../shared/pricing.js';
 
 type Row = Record<string, any>;
 type Queryable = Pick<PoolClient, 'query'>;
@@ -63,6 +64,7 @@ export function procurementView(row: Row): Procurement {
     succeededAt: date(row.succeeded_at),
     finalizedAt: date(row.finalized_at),
     frozenAt: date(row.frozen_at),
+    feePolicy: row.frozen_snapshot ? feePolicyForSnapshot(row.frozen_snapshot) : CURRENT_FEE_POLICY,
     bestPriceCents: row.best_price_cents,
     activeCount: Number(row.active_count ?? 0),
     createdAt: date(row.created_at)!,

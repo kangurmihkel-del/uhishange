@@ -14,7 +14,12 @@ export default defineConfig({
     coverage: {
       provider: 'v8',
       enabled: true,
-      include: ['src/server/**/*.ts', 'src/client/api.ts', 'src/shared/serviceForms.ts'],
+      include: [
+        'src/server/**/*.ts',
+        'src/client/api.ts',
+        'src/shared/serviceForms.ts',
+        'src/shared/pricing.ts',
+      ],
       exclude: ['src/server/server.ts', 'src/server/worker.ts'],
       reporter: ['text', 'json-summary', 'lcov'],
       reportsDirectory: 'coverage',

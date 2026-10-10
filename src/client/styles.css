@@ -1443,6 +1443,60 @@ details > summary::-webkit-details-marker {
   color: var(--muted);
   margin-left: 5px;
 }
+.fee-terms,
+.deposit-coverage-note,
+.contract-fee-summary {
+  color: var(--muted);
+  font-size: 12px;
+  line-height: 1.7;
+  margin: 12px 0 16px;
+}
+.fee-terms strong,
+.contract-fee-summary strong {
+  color: var(--forest);
+}
+.supplier-fee-preview {
+  border: 1px solid var(--line);
+  background: var(--paper);
+  border-radius: 9px;
+  padding: 15px;
+  margin: 14px 0 20px;
+}
+.supplier-fee-preview h4 {
+  margin: 0 0 7px;
+  font-size: 13px;
+}
+.supplier-fee-preview > p {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.7;
+  margin: 0 0 12px;
+}
+.fee-preview-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  border-top: 1px solid var(--line);
+  margin: 0;
+  padding: 12px 0;
+}
+.fee-preview-row:last-child {
+  padding-bottom: 0;
+}
+.fee-preview-row dt {
+  color: var(--muted);
+  font-size: 11px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.fee-preview-row dd {
+  margin: 6px 0 0;
+  color: var(--forest);
+  font-size: 13px;
+  line-height: 1.6;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
 .offer-terms {
   border-top: 1px solid var(--line);
   padding-top: 14px;
