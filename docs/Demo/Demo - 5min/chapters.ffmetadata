@@ -1,0 +1,87 @@
+;FFMETADATA1
+title=Ühishange — kogu hankeprotsessi demo
+[CHAPTER]
+TIMEBASE=1/1000
+START=102
+END=12350
+title=Ühine tellimus algab siit
+[CHAPTER]
+TIMEBASE=1/1000
+START=12350
+END=39350
+title=Ühistu esindaja registreerub
+[CHAPTER]
+TIMEBASE=1/1000
+START=39350
+END=46554
+title=Administraator kinnitab esindusõiguse
+[CHAPTER]
+TIMEBASE=1/1000
+START=46554
+END=62932
+title=Naaberühistu lisamine CSV-st
+[CHAPTER]
+TIMEBASE=1/1000
+START=62932
+END=90448
+title=Algataja kirjeldab hankesoovi
+[CHAPTER]
+TIMEBASE=1/1000
+START=90448
+END=101523
+title=Kaart ja kutsed naaberühistutele
+[CHAPTER]
+TIMEBASE=1/1000
+START=101523
+END=134186
+title=Pakkuja esitab astmelise hinna
+[CHAPTER]
+TIMEBASE=1/1000
+START=134186
+END=143644
+title=Algataja saab pakkumise postkasti
+[CHAPTER]
+TIMEBASE=1/1000
+START=143644
+END=162068
+title=Esimene ühistu liitub ja maksab
+[CHAPTER]
+TIMEBASE=1/1000
+START=162068
+END=188035
+title=Naaber võtab kutse vastu ja liitub
+[CHAPTER]
+TIMEBASE=1/1000
+START=188035
+END=218265
+title=Kolmas ühistu langetab hinna 700 euroni
+[CHAPTER]
+TIMEBASE=1/1000
+START=218265
+END=222035
+title=Taustatöö lõpetab liitumise tähtajal
+[CHAPTER]
+TIMEBASE=1/1000
+START=222035
+END=233332
+title=Leping ja lõplik hinnaarvestus
+[CHAPTER]
+TIMEBASE=1/1000
+START=233332
+END=271105
+title=Hooaja lõpu ja hinnangu demonstratsioon
+[CHAPTER]
+TIMEBASE=1/1000
+START=271105
+END=278733
+title=Administraator kontrollib TEST pearaamatut
+[CHAPTER]
+TIMEBASE=1/1000
+START=278733
+END=292011
+title=Püsiv ajalugu ja lõpetatud hange
+[CHAPTER]
+TIMEBASE=1/1000
+START=292011
+END=301526
+title=Ühine hange on lõpetatud

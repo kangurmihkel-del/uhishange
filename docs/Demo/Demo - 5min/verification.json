@@ -1,0 +1,146 @@
+{
+  "recordedAt": "2026-10-10T13:33:28.896Z",
+  "databaseName": "uhishange_recording_1791638431662",
+  "procurementId": "1d255b33-4d0c-443e-9b9d-67b84a5dfd2f",
+  "mainBusinessRecordsUnchanged": true,
+  "mainBefore": {
+    "users": {
+      "count": 11,
+      "hash": "4176efd9866c9b0135efbc520b82de20"
+    },
+    "organizations": {
+      "count": 9,
+      "hash": "9b3c7ee828810605a1ba89554b413184"
+    },
+    "procurements": {
+      "count": 10,
+      "hash": "ce01a30d1bde422958f127ab8a59ffa8"
+    },
+    "commitments": {
+      "count": 4,
+      "hash": "1c0b7455c21f835995335e24cb3b46e5"
+    },
+    "contracts": {
+      "count": 0,
+      "hash": "d751713988987e9331980363e24189ce"
+    },
+    "ledger": {
+      "count": 3,
+      "hash": "3d18704c6a2684b10cf1c3745c1e5089"
+    },
+    "audit": {
+      "count": 35,
+      "hash": "10635318ac7100071aaa524400c6b5e4"
+    }
+  },
+  "mainAfter": {
+    "users": {
+      "count": 11,
+      "hash": "4176efd9866c9b0135efbc520b82de20"
+    },
+    "organizations": {
+      "count": 9,
+      "hash": "9b3c7ee828810605a1ba89554b413184"
+    },
+    "procurements": {
+      "count": 10,
+      "hash": "ce01a30d1bde422958f127ab8a59ffa8"
+    },
+    "commitments": {
+      "count": 4,
+      "hash": "1c0b7455c21f835995335e24cb3b46e5"
+    },
+    "contracts": {
+      "count": 0,
+      "hash": "d751713988987e9331980363e24189ce"
+    },
+    "ledger": {
+      "count": 3,
+      "hash": "3d18704c6a2684b10cf1c3745c1e5089"
+    },
+    "audit": {
+      "count": 35,
+      "hash": "10635318ac7100071aaa524400c6b5e4"
+    }
+  },
+  "procurement": {
+    "status": "COMPLETED",
+    "best_price_cents": 70000,
+    "succeeded_at": "2026-10-10T13:23:31.784Z",
+    "frozen_at": "2026-10-10T13:23:02.823Z",
+    "join_deadline_at": "2026-10-10T13:29:00.000Z",
+    "finalized_at": "2026-10-10T13:29:00.811Z"
+  },
+  "commitments": [
+    {
+      "status": "CONTRACTED",
+      "deposit_cents": 10000,
+      "captured_at": "2026-10-10T13:23:31.784Z",
+      "refunded_at": null
+    },
+    {
+      "status": "CONTRACTED",
+      "deposit_cents": 10000,
+      "captured_at": "2026-10-10T13:23:10.420Z",
+      "refunded_at": null
+    },
+    {
+      "status": "CONTRACTED",
+      "deposit_cents": 10000,
+      "captured_at": "2026-10-10T13:23:57.034Z",
+      "refunded_at": null
+    }
+  ],
+  "contracts": [
+    {
+      "status": "COMPLETED",
+      "price_cents": 70000,
+      "deposit_credit_cents": 10000,
+      "balance_cents": 60000,
+      "rating": 5
+    },
+    {
+      "status": "COMPLETED",
+      "price_cents": 70000,
+      "deposit_credit_cents": 10000,
+      "balance_cents": 60000,
+      "rating": 5
+    },
+    {
+      "status": "COMPLETED",
+      "price_cents": 70000,
+      "deposit_credit_cents": 10000,
+      "balance_cents": 60000,
+      "rating": 5
+    }
+  ],
+  "ledger": [
+    {
+      "kind": "DEPOSIT",
+      "count": 3,
+      "cents": 30000,
+      "all_test": true
+    },
+    {
+      "kind": "PLATFORM_FEE",
+      "count": 3,
+      "cents": 1200,
+      "all_test": true
+    },
+    {
+      "kind": "SUPPLIER_PAYOUT",
+      "count": 3,
+      "cents": 28800,
+      "all_test": true
+    }
+  ],
+  "browserErrors": [],
+  "media": {
+    "codec": "h264",
+    "width": 1440,
+    "height": 900,
+    "seconds": 301.526,
+    "chapters": 17,
+    "fullDecodePassed": true
+  }
+}
