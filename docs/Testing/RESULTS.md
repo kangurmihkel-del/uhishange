@@ -14,7 +14,7 @@ The functional local pilot is running at http://localhost:3000. All required loc
 | npm audit --audit-level=moderate | Passed: zero reported vulnerabilities                                                        |
 | docker compose config --quiet    | Passed                                                                                       |
 | docker compose up --build -d     | Passed: production images built and services initialized                                     |
-| node scripts/verify-preview.mjs  | Passed: fourteen production screenshots, zero browser errors and no horizontal page overflow |
+| node scripts/verify-preview.mjs  | Passed: eighteen production screenshots, zero browser errors and no horizontal page overflow |
 
 Environment: Node 24.19.0, PostgreSQL 17.5, PostGIS 3.5.2, Vitest 5.0.3 and Playwright Chromium. The browser suite uses the compiled production application on a separate port and database.
 
@@ -101,3 +101,22 @@ The Docker production rebuild and fourteen screenshot smoke checks pass with zer
 - [All demo service types](screenshots/service-types-desktop.png)
 - [Pest-control procurement](screenshots/pest-procurement-desktop.png)
 - [Mobile branch-cleanup form](screenshots/branch-form-mobile.png)
+
+## CVI design acceptance
+
+The portal now follows the unchanged supplied CVI across public entry, buyer and supplier views, forms, geographic discovery, mailbox, agreement history and administration. The final production build and static analysis passed. The complete `npm test` run exited successfully with 26 real PostgreSQL/PostGIS integration/API/time tests and 12 desktop/mobile browser cases (38 total). Configured V8 coverage remains 91.23% statements, 71.16% branches, 89.88% functions and 92.92% lines; the scope and exclusions above still apply.
+
+Browser assertions verify that all three public navigation links focus and reveal actual content without changing the application route, the main CTA opens registration and focuses the name field, and Lora/Work Sans load from the portal origin with Estonian characters. Participation checks follow zero, one, threshold and above-threshold confirmed payments, then withdrawals down to one of two required buyers. The current count falls to 1/2 while historical success and the achieved €700 price remain unchanged. A 1,000-participant offer displays the exact goal with at most 20 decorative dots and no page overflow.
+
+The Docker production rebuild preserves the database volume. All eighteen production smoke captures passed with zero browser errors or horizontal page overflow. Visual review covered public entry, buyer dashboard, service list/details, mobile creation, neighbor map, mailbox, administrator approvals and saved contracts. Mobile service questions use full width, creation cards have clear spacing, and map markers distinguish neighbors, selection and the procurement center. Darker accent text and input boundaries support readable contrast; focus states remain visible. This is scenario and visual verification, not a full accessibility audit.
+
+The four original inputs, retained MCAF guide, supplied HTML catalog and CVI document match their recorded SHA-256 hashes. No server, shared contract or migration files changed in this design update. Production health reports `status: ok`, `database: ready` and `paymentMode: TEST`; the database/application are healthy, the worker is running and initialization exited with code 0. Production smoke checks only add demo sessions/read receipts and do not create financial transactions.
+
+Updated screenshots above show the CVI. Additional public and mobile discovery views:
+
+- [Public services](screenshots/public-services-desktop.png)
+- [Public process explanation](screenshots/public-process-desktop.png)
+- [Public supplier information](screenshots/public-provider-desktop.png)
+- [Mobile neighbor discovery](screenshots/neighbors-mobile.png)
+
+Locally bundled fonts and original licenses are documented in [public/fonts/README.md](../../public/fonts/README.md). The design decision and preserved business-rule precedence are recorded in [ADR 0004](../ADR/0004-cvi-design.md).

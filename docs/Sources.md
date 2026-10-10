@@ -12,3 +12,5 @@ The MCAF guide is retained at docs/MCAF Guide.md. Its CC BY 4.0 attribution and 
 The initial public source commit excluded the event poster. The maintainer's subsequent documentation reorganization (a88449c) added it under docs/1000012998.jpg and moved the other original inputs and attributed MCAF guide into docs/. All four originals are now tracked there; source hashes above describe the preserved files. Git attributes preserve binary inputs and the guide without text normalization.
 
 The supplied standalone service form is preserved as [Uhishange_vorm.html](../Uhishange_vorm.html). Its five version 1 service definitions are reused by the portal; the bundled HTML is not edited. SHA-256 before this extension: 939d79e4cb551ac5477dbb8c82b4721afe94b60833d8b1eb3621b7bfc41c6316.
+
+The supplied [CVI document](Uhishange_CVI.docx) defines the portal's visual identity and remains unchanged. SHA-256 before the design update: ab4ccf887960ddd24c57643c4282380fbbd50f5e05d2ceb2c472e7a072a9c626. Locally bundled font sources and licenses are recorded in [public/fonts/README.md](../public/fonts/README.md).
