@@ -17,3 +17,5 @@ Follow-up acceptance coverage verifies readable frozen agreement history on desk
 Invitation browser coverage includes an approved viewer: invitations remain readable, response controls are absent, and the API rejects a forged response.
 
 Mailbox coverage uses real PostgreSQL/HTTP to verify seed and newly sent invitation messages, organization isolation, viewer restrictions, per-user read persistence and idempotence, offer/lifecycle notifications, and no duplicates from repeated sends or payment replay. Browser scenarios follow the visible next-action controls, open the neighbor demo mailbox, respond to an invitation, join/pay, and reach contract review without hunting for tabs on desktop/mobile.
+
+Multi-service coverage follows the supplied HTML catalog: all five server-validated forms, optional/conditional field visibility, type switching, numeric and date validation, legacy compatibility, frozen non-snow acceptance/final scopes, idempotent seed upgrades and desktop/mobile category discovery and service procurement. Run the new/changed cases first, then the related suites and full canonical gates.

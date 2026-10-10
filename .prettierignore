@@ -8,3 +8,6 @@ test-results
 *.docx
 *.jpg
 *.png
+
+# Retained standalone source form, including its bundled runtime.
+Uhishange_vorm.html

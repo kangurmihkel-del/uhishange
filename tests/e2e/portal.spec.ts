@@ -9,6 +9,7 @@ import {
   navigate,
   nextAction,
   registrationPassword,
+  serviceField,
   uniqueTitle,
 } from './helpers.js';
 import type {
@@ -17,6 +18,7 @@ import type {
   MailboxResponse,
   ProcurementDetail,
   SessionResponse,
+  ServiceSpec,
 } from '../../src/shared/types.js';
 
 test.afterAll(async () => {
@@ -35,7 +37,7 @@ test('buyer, supplier and neighboring buyers reach a lower tier through the port
   await page
     .getByLabel('Kirjeldus', { exact: true })
     .fill('Parkimisala ja kõnniteede ühine talvine hooldus.');
-  await page.getByLabel('Koristusala (m²)', { exact: true }).fill('600');
+  await serviceField(page, 'Koristusala (m²)').fill('600');
   await page.getByRole('button', { name: 'Salvesta hange', exact: true }).click();
   await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
   const id = page.url().split('#procurement/')[1];
@@ -292,7 +294,22 @@ test('individual contracts expose final prices, accept ratings and retain cancel
   page,
   request,
 }) => {
-  const fixture = await finalizedFixture(request);
+  const pestSpec: ServiceSpec = {
+    formId: 'pest',
+    version: 1,
+    answers: {
+      pests: ['Rotid'],
+      extent: 'Prügimaja ja kelder.',
+      apartments: 60,
+      treatment: 'Regulaarne hooldus',
+      frequency: 'Kord kuus',
+      safety: 'Lukustatud söödakastid; laste ja lemmikloomade ohutus.',
+      location: 'Sõpruse pst 212, Mustamäe, Tallinn',
+      pricing: 'Fikseeritud koguhind',
+    },
+  };
+  const fixture = await finalizedFixture(request, pestSpec);
+  expect(fixture.contract.finalSnapshot.spec).toEqual(pestSpec);
   await login(page);
   await navigate(page, /^Postkast/);
   const inbox = await api<MailboxResponse>(page.request, '/mailbox');
@@ -335,9 +352,14 @@ test('individual contracts expose final prices, accept ratings and retain cancel
   await expect(contract).toContainText('799,97');
   await contract.getByText('Lepingu lõplik tingimuste koopia', { exact: true }).click();
   const history = contract.getByTestId('agreement-history');
-  await expect(history).toContainText('Lõplik hooaja hind');
+  await expect(history).toContainText('Lõplik teenuse hind');
   await expect(history).toContainText('Teenuse kirjeldus vastavalt hankele.');
-  await expect(history).toContainText('300 m²');
+  await expect(history).toContainText('Kahjuritõrje');
+  await expect(history).toContainText('Rotid');
+  await expect(history).toContainText('Regulaarne hooldus');
+  await expect(history).toContainText('Kord kuus');
+  await expect(history).toContainText('Lukustatud söödakastid; laste ja lemmikloomade ohutus.');
+  await expect(history).not.toContainText('Koristusala');
   await expect(history).toContainText('TESTMAKSE · Tegelikku raha ei liigu.');
   await expect(history.locator('pre')).toHaveCount(0);
   const frozenBuyer = fixture.contract.finalSnapshot.buyerOrganization;
@@ -387,9 +409,7 @@ test('individual contracts expose final prices, accept ratings and retain cancel
   }
   await contract.getByRole('button', { name: 'Lõpeta teenus ja hinda', exact: true }).click();
   await contract.getByLabel('Hinnang teenusele', { exact: true }).selectOption('5');
-  await contract
-    .getByLabel('Kommentaar', { exact: true })
-    .fill('Õigeaegne ja korralik lumekoristus.');
+  await contract.getByLabel('Kommentaar', { exact: true }).fill('Õigeaegne ja ohutu kahjuritõrje.');
   await contract.getByRole('button', { name: 'Salvesta hinnang', exact: true }).click();
   await expect(contract).toContainText('Teenus lõpetatud');
   await expect(contract.getByLabel('Hinnang 5 viiest', { exact: true })).toBeVisible();
@@ -414,10 +434,10 @@ test('individual contracts expose final prices, accept ratings and retain cancel
     .getByTestId('contract-card')
     .filter({ hasText: fixture.procurement.title });
   await expect(cancelled).toContainText('Tühistatud');
-  await expect(cancelled).toContainText('Õigeaegne ja korralik lumekoristus.');
+  await expect(cancelled).toContainText('Õigeaegne ja ohutu kahjuritõrje.');
   await cancelled.getByText('Lepingu lõplik tingimuste koopia', { exact: true }).click();
   await expect(cancelled.getByTestId('agreement-history')).toContainText(frozenBuyer.address);
-  await expect(cancelled.getByTestId('agreement-history')).toContainText('Lõplik hooaja hind');
+  await expect(cancelled.getByTestId('agreement-history')).toContainText('Lõplik teenuse hind');
   await expectResponsive(page);
   await expect(
     cancelled.getByRole('button', { name: 'Lõpeta teenus ja hinda', exact: true }),
@@ -504,4 +524,225 @@ test('approved viewers read mailbox invitations without response authority', asy
     page.getByTestId('next-action').getByRole('button', { name: 'Kinnita liitumine', exact: true }),
   ).toHaveCount(0);
   await expectResponsive(page);
+});
+
+test('source service types use conditional questions, clear stale answers and remain discoverable', async ({
+  page,
+}) => {
+  test.setTimeout(90_000);
+  await login(page);
+  const created: Array<{
+    id: string;
+    title: string;
+    formId: ServiceSpec['formId'];
+    label: string;
+  }> = [];
+  for (const [formId, label] of [
+    ['pest', 'Kahjuritõrje'],
+    ['energy', 'Energiamärgis'],
+    ['branches', 'Okste koristamine'],
+    ['other', 'Muu teenus – vabas vormis'],
+  ] as const) {
+    await page.goto('/#new');
+    const type = page.getByLabel('Hanketüüp', { exact: true });
+    await expect(type).toHaveValue('snow');
+    if (formId === 'pest') {
+      await page.getByRole('checkbox', { name: 'Lume äravedu', exact: true }).check();
+      await serviceField(page, 'Lume kogumise ja äraveo tingimused').fill(
+        'Vana lumevastus peab tüübi vahetamisel kaduma.',
+      );
+    }
+    await type.selectOption(formId);
+    await expect(serviceField(page, 'Koristusala (m²)')).toHaveCount(0);
+    await expect(serviceField(page, 'Lume kogumise ja äraveo tingimused')).toHaveCount(0);
+    const title = uniqueTitle('Brauseri ' + label);
+    await page.getByLabel('Hanke pealkiri', { exact: true }).fill(title);
+    await page
+      .getByLabel('Kirjeldus', { exact: true })
+      .fill('Ühise teenuse täpne kirjeldus lähikonna ühistutele.');
+    await serviceField(page, 'Tööde asukoht').fill('Sõpruse pst 212, Mustamäe, Tallinn');
+    await serviceField(page, 'Ligipääs ja eritingimused').fill('Esindaja avab värava.');
+    await serviceField(page, 'Soovitud tööde kuupäev').fill('2030-06-15');
+    await serviceField(page, 'Soovitud hinnapakkumise vorm').selectOption(
+      'Ühikuhind koos koguhinnaga',
+    );
+    if (formId === 'pest') {
+      await page.getByRole('checkbox', { name: 'Rotid', exact: true }).check();
+      await page.getByRole('checkbox', { name: 'Hiired', exact: true }).check();
+      await serviceField(page, 'Probleemi ulatus ja mõjutatud ruumid').fill('Kelder ja prügimaja.');
+      await serviceField(page, 'Korterite arv').fill('60');
+      await expect(serviceField(page, 'Hoolduse sagedus')).toHaveCount(0);
+      await serviceField(page, 'Teenuse iseloom').selectOption('Regulaarne hooldus');
+      await serviceField(page, 'Hoolduse sagedus').selectOption('Kord kuus');
+      await serviceField(page, 'Teenuse iseloom').selectOption('Ühekordne tõrje');
+      await expect(serviceField(page, 'Hoolduse sagedus')).toHaveCount(0);
+      await serviceField(page, 'Teenuse iseloom').selectOption('Regulaarne hooldus');
+      await expect(serviceField(page, 'Hoolduse sagedus')).toHaveValue('');
+      await serviceField(page, 'Hoolduse sagedus').selectOption('Kord kuus');
+      await serviceField(page, 'Ohutus ja tõrjevahendite piirangud').fill(
+        'Lukustatud söödakastid; laste ja lemmikloomade ohutus.',
+      );
+    } else if (formId === 'energy') {
+      await serviceField(page, 'Hoone liik').selectOption('Olemasolev hoone');
+      await serviceField(page, 'Köetav pind (m²)').fill('3500.5');
+      await serviceField(page, 'Energiatarbimise andmed').selectOption('Osaliselt olemas');
+      await page
+        .getByRole('checkbox', { name: 'Soovin ka energiatõhususe soovitusi', exact: true })
+        .check();
+    } else if (formId === 'branches') {
+      await serviceField(page, 'Okste hinnanguline maht (m³)').fill('5.5');
+      await page.getByRole('checkbox', { name: 'Oksad on kokku kogutud', exact: true }).check();
+      await page.getByRole('checkbox', { name: 'Vajalik on ka lõikamine', exact: true }).check();
+      await serviceField(page, 'Lõikamistööde kirjeldus').fill('Vana tingimus.');
+      await page.getByRole('checkbox', { name: 'Vajalik on ka lõikamine', exact: true }).uncheck();
+      await expect(serviceField(page, 'Lõikamistööde kirjeldus')).toHaveCount(0);
+      await page.getByRole('checkbox', { name: 'Vajalik on ka lõikamine', exact: true }).check();
+      await expect(serviceField(page, 'Lõikamistööde kirjeldus')).toHaveValue('');
+      await serviceField(page, 'Lõikamistööde kirjeldus').fill(
+        'Lõigata ainult maha langenud okste osad.',
+      );
+    } else {
+      await serviceField(page, 'Teenuse või töö nimetus').fill('Trepikodade suurpuhastus');
+      await serviceField(page, 'Tööde kirjeldus').fill(
+        'Pesta kolme trepikoja põrandad ja käsipuud.',
+      );
+      await serviceField(page, 'Töö maht või kogus').fill('3 trepikoda');
+      await page
+        .getByRole('checkbox', { name: 'Pakkuja peab objektiga kohapeal tutvuma', exact: true })
+        .check();
+    }
+    await expectResponsive(page);
+    await page.getByRole('button', { name: 'Salvesta hange', exact: true }).click();
+    await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
+    const id = page.url().split('#procurement/')[1];
+    const saved = await api<ProcurementDetail>(page.request, '/procurements/' + id);
+    const spec = saved.procurement.spec as ServiceSpec;
+    expect(spec.formId).toBe(formId);
+    expect(spec.version).toBe(1);
+    expect(spec.answers.location).toBe('Sõpruse pst 212, Mustamäe, Tallinn');
+    expect(spec.answers.desiredDate).toBe('2030-06-15');
+    expect(spec.answers.pricing).toBe('Ühikuhind koos koguhinnaga');
+    expect(spec.answers).not.toHaveProperty('areaM2');
+    expect(spec.answers).not.toHaveProperty('snowStorage');
+    if (formId === 'pest') {
+      expect(spec.answers.pests).toEqual(['Rotid', 'Hiired']);
+      expect(spec.answers.frequency).toBe('Kord kuus');
+      await expect(page.getByText('Kord kuus', { exact: true })).toBeVisible();
+    } else if (formId === 'branches') {
+      expect(spec.answers.cuttingScope).toBe('Lõigata ainult maha langenud okste osad.');
+      await expect(
+        page.getByText('Lõigata ainult maha langenud okste osad.', { exact: true }),
+      ).toBeVisible();
+    } else if (formId === 'energy') {
+      expect(spec.answers.heatedArea).toBe(3500.5);
+    } else {
+      expect(spec.answers.serviceName).toBe('Trepikodade suurpuhastus');
+    }
+    await nextAction(page, 'Avalda hange');
+    created.push({ id, title, formId, label });
+  }
+  await navigate(page, 'Hanked');
+  const filter = page.getByLabel('Hanketüüp', { exact: true });
+  for (const item of created) {
+    await filter.selectOption(item.formId);
+    const cards = page.locator('.procurement-card');
+    await expect(cards.filter({ hasText: item.title })).toHaveCount(1);
+    const badges = await cards.locator('.service-badge').allTextContents();
+    expect(badges.length).toBeGreaterThan(0);
+    expect(badges.every((label) => label === item.label)).toBe(true);
+    await expectResponsive(page);
+  }
+  await filter.selectOption('all');
+
+  for (const item of created)
+    await expect(page.getByRole('link').filter({ hasText: item.title })).toHaveCount(1);
+  const pest = created.find((item) => item.formId === 'pest')!;
+  await page.goto('/#procurement/' + pest.id);
+  await nextAction(page, 'Kutsu naabrid');
+  await page.getByRole('button', { name: 'Saada kutsed', exact: true }).click();
+  await expect(
+    page.getByRole('status').filter({ hasText: 'Piirkonna ühistutele on saadetud' }),
+  ).toBeVisible();
+  await logout(page);
+  await login(page, 'supplier@demo.test');
+  await page.goto('/#procurement/' + pest.id);
+  await nextAction(page, 'Esita pakkumine');
+  await page.getByLabel('Teenuse tavahind (€)', { exact: true }).fill('1000');
+  await page.getByLabel('Tagatisraha (€)', { exact: true }).fill('100.03');
+  await page.getByLabel(/^Osalejate arv(?! 2)/).fill('2');
+  await page.getByLabel('Teenuse hind (€)', { exact: true }).fill('900');
+  await page.getByLabel('Osalejate arv 2', { exact: true }).fill('3');
+  await page.getByLabel('Teenuse hind (€) 2', { exact: true }).fill('700');
+  await page
+    .getByLabel('Pakkumise tingimused', { exact: true })
+    .fill('Kord kuus: ohutu kahjuritõrje ja tulemuse kontroll.');
+  await page.getByRole('button', { name: 'Saada pakkumine', exact: true }).click();
+  await expect(
+    page.getByRole('status').filter({ hasText: 'Pakkumine on esitatud.' }),
+  ).toBeVisible();
+  await logout(page);
+  await login(page);
+  await page.goto('/#procurement/' + pest.id);
+  await nextAction(page, 'Võrdle ja vali pakkumine');
+  await page.getByRole('button', { name: 'Vali pakkumine', exact: true }).click();
+  for (let buyer = 1; buyer <= 2; buyer++) {
+    if (buyer === 2) {
+      await logout(page);
+      await page.getByRole('button', { name: 'Naaberühistu', exact: true }).click();
+      await expect(page.getByRole('button', { name: 'Logi välja', exact: true })).toBeVisible();
+      await navigate(page, /^Postkast/);
+      const inbox = await api<MailboxResponse>(page.request, '/mailbox');
+      const invitation = inbox.messages.find(
+        (message) => message.procurementId === pest.id && message.kind === 'INVITATION',
+      )!;
+      expect(invitation).toBeDefined();
+      const letter = page.getByTestId('mailbox-message').filter({ hasText: invitation.subject });
+      await letter.getByRole('button', { name: 'Ava kiri', exact: true }).click();
+      const detail = page.getByTestId('mailbox-detail');
+      await expect(detail).not.toContainText(/lumekoristus/i);
+      await detail.getByRole('button', { name: 'Võta kutse vastu', exact: true }).click();
+      await expect(detail).toContainText(/vastu võetud/i);
+      await detail.getByRole('link', { name: 'Vaata hanget', exact: true }).click();
+    }
+    await nextAction(page, 'Kinnita liitumine');
+    await page
+      .getByRole('checkbox', {
+        name: 'Kinnitan, et mul on õigus ühistu nimel kohustusi võtta.',
+        exact: true,
+      })
+      .check();
+    await page
+      .getByRole('checkbox', {
+        name: 'Kinnitan ühise teenuse ulatuse, pakkumise ja tagatisraha tingimused.',
+        exact: true,
+      })
+      .check();
+    await page.getByRole('button', { name: 'Liitu hankega', exact: true }).click();
+    await page.getByText('Liitumisel kinnitatud tingimused', { exact: true }).click();
+    const history = page.getByTestId('agreement-history');
+    await expect(history).toContainText('Kahjuritõrje');
+    await expect(history).toContainText('Rotid, Hiired');
+    await expect(history).toContainText('Kord kuus');
+    await expect(history).toContainText('Ühikuhind koos koguhinnaga');
+    await expect(history).not.toContainText('Koristusala');
+    await expect(history).toContainText('Kord kuus: ohutu kahjuritõrje ja tulemuse kontroll.');
+    await page.getByText('Liitumisel kinnitatud tingimused', { exact: true }).click();
+    await nextAction(page, 'Tee testmakse');
+    await expect(
+      page.getByText('TESTMAKSE · Tegelikku raha ei liigu', { exact: true }).first(),
+    ).toBeVisible();
+    await page.getByRole('button', { name: 'Kinnita testmakse', exact: true }).click();
+    await expect(page.getByText(buyer + ' makstud liitumist', { exact: true })).toBeVisible();
+    await expectResponsive(page);
+  }
+  const completed = await api<ProcurementDetail>(page.request, '/procurements/' + pest.id);
+  expect(completed.procurement.status).toBe('SUCCEEDED');
+  expect(completed.procurement.activeCount).toBe(2);
+  expect(completed.procurement.bestPriceCents).toBe(90_000);
+  expect(
+    completed.commitments.every(
+      (row) =>
+        'formId' in row.acceptanceSnapshot.spec && row.acceptanceSnapshot.spec.formId === 'pest',
+    ),
+  ).toBe(true);
 });

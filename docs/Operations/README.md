@@ -64,3 +64,7 @@ Live payments, external email, registry integration and hosting remain deferred.
 ## Mailbox upgrades
 
 Run the normal Compose rebuild to apply versioned migrations and keep the database volume. Migration 002 creates durable mailbox messages/read receipts and backfills existing invitations. Startup also backfills invitations idempotently for fresh demo data. No reset is required. Mailbox notifications are written transactionally with domain events; failed deadline processing publishes no finalization letter until a successful retry. The UI polls every five seconds and read state survives restart. External email is not sent.
+
+## Service demo upgrade
+
+The standard bootstrap adds four fictional service procurements (pest control, energy certificates, branch cleanup and free-form service) with stable identities. Repeated startup preserves their lifecycle and financial history and creates no duplicate examples. This extension uses the existing JSONB specification storage and does not rewrite legacy snow records. Rebuild Compose normally; no volume reset is required.

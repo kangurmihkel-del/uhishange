@@ -1243,9 +1243,32 @@ details > summary::-webkit-details-marker {
   padding-left: 18px;
 }
 .aside-note {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
   border-top: 1px solid var(--line);
   padding-top: 15px;
   margin-top: 20px;
+}
+.aside-note > svg {
+  flex-shrink: 0;
+  color: var(--teal);
+  margin-top: 2px;
+}
+.aside-note > div {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12px;
+  line-height: 1.6;
+  overflow-wrap: anywhere;
+}
+.aside-note span,
+.aside-note small {
+  color: var(--muted);
+}
+.aside-note small {
+  font-size: 11px;
 }
 .back-link {
   display: inline-flex;
@@ -3179,5 +3202,122 @@ small.join-deposit {
   }
   .mailbox-detail-links > .button {
     width: 100%;
+  }
+}
+
+/* Versioned procurement service forms and readable saved scope. */
+.service-badge {
+  display: inline-flex;
+  align-items: center;
+  max-width: 100%;
+  padding: 5px 9px;
+  border-radius: 6px;
+  background: #e4f1ee;
+  color: #126859;
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.procurement-card > .service-badge {
+  margin-top: 12px;
+}
+.category-filter {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 22px;
+  font-size: 12px;
+  font-weight: 600;
+}
+.category-filter select {
+  width: auto;
+  min-width: 230px;
+  max-width: 100%;
+}
+.service-fields .service-multiselect {
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 16px;
+  min-width: 0;
+  margin: 0;
+}
+.service-multiselect legend {
+  padding: 0 6px;
+}
+.service-options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 13px;
+}
+.service-options .checkbox span {
+  min-width: 0;
+}
+.service-checkbox-field {
+  padding-top: 7px;
+}
+.service-field-help {
+  display: grid;
+  gap: 5px;
+  font-weight: 400;
+}
+.service-field-help small {
+  color: #5b7180;
+  font-size: 11px;
+  line-height: 1.6;
+}
+.service-field-error {
+  margin: 0;
+  color: #a13535;
+  font-size: 12px;
+  line-height: 1.6;
+}
+.service-fields [aria-invalid='true'] {
+  border-color: #b94b4b;
+}
+.service-fields .service-options input[aria-invalid='true'] {
+  outline: 1px solid #b94b4b;
+  outline-offset: 2px;
+}
+.scope-grid .scope-item dt {
+  display: block;
+  font-size: 10px;
+  color: #5b7180;
+  margin-bottom: 5px;
+}
+.scope-grid .scope-item dd {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1.7;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.agreement-facts .scope-item dd {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.agreement-form-label {
+  color: #5b7180;
+  font-size: 11px;
+}
+@media (max-width: 600px) {
+  .category-filter {
+    align-items: stretch;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .category-filter select {
+    width: 100%;
+    min-width: 0;
+  }
+  .service-options {
+    grid-template-columns: 1fr;
+  }
+  .service-fields .service-multiselect {
+    padding: 13px;
+  }
+  .form-card .section-heading {
+    flex-wrap: wrap;
   }
 }

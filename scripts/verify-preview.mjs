@@ -34,8 +34,13 @@ try {
   await expect(page.getByRole('heading', { name: /^Tere,/ })).toBeVisible();
   const list = await page.request.get('/api/v1/procurements');
   const rows = (await list.json()).procurements;
-  await expect(page.getByRole('link', { name: /Sõpruse puiestee lumevaba talv/ })).toBeVisible();
   await snapshot(page, 'buyer-desktop');
+  const types = new Set(rows.map((row) => row.spec.formId || 'snow'));
+  for (const type of ['snow', 'pest', 'energy', 'branches', 'other'])
+    if (!types.has(type)) throw new Error('Missing demo service ' + type);
+  await page.goto('/#procurements');
+  await expect(page.getByLabel('Hanketüüp', { exact: true })).toBeVisible();
+  await snapshot(page, 'service-types-desktop');
   const demo = rows.find((row) => row.title === 'Sõpruse puiestee lumevaba talv');
   if (!demo) throw new Error('Seeded procurement missing');
   await page.goto('/#procurement/' + demo.id);
@@ -48,6 +53,10 @@ try {
   await page.getByRole('button', { name: /^Naabrid ja kutsed/ }).click();
   await expect(page.getByRole('img', { name: /Hanke keskpunkt/ })).toBeVisible();
   await snapshot(page, 'neighbors-desktop');
+  const pest = rows.find((row) => row.spec.formId === 'pest');
+  await page.goto('/#procurement/' + pest.id);
+  await expect(page.getByTestId('service-scope')).toContainText('Kahjuritõrje');
+  await snapshot(page, 'pest-procurement-desktop');
   await page.getByRole('button', { name: 'Logi välja', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Naaberühistu', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Naaberühistu', exact: true }).click();
@@ -82,8 +91,14 @@ try {
   await snapshot(phone, 'login-mobile');
   await phone.getByRole('button', { name: 'Ostja', exact: true }).click();
   await expect(phone.getByRole('heading', { name: /^Tere,/ })).toBeVisible();
-  await expect(phone.getByRole('link', { name: /Sõpruse puiestee lumevaba talv/ })).toBeVisible();
   await snapshot(phone, 'buyer-mobile');
+  await phone.goto('/#new');
+  await phone.getByLabel('Hanketüüp', { exact: true }).selectOption('branches');
+  await phone.getByLabel('Vajalik on ka lõikamine', { exact: true }).check();
+  await expect(
+    phone.getByRole('textbox', { name: 'Lõikamistööde kirjeldus', exact: true }),
+  ).toBeVisible();
+  await snapshot(phone, 'branch-form-mobile');
   await phone.goto('/#procurement/' + demo.id);
   await expect(phone.getByRole('heading', { name: demo.title, exact: true })).toBeVisible();
   await snapshot(phone, 'procurement-mobile');

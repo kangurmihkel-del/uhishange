@@ -54,11 +54,27 @@ import type {
   Procurement,
   ProcurementDetail,
   SessionResponse,
+  ServiceAnswers,
+  ServiceFormId,
+  ProcurementSpec,
 } from '../shared/types';
 import { api, date, euro, localDateTime, utcDateTime } from './api';
+import {
+  SERVICE_FORMS,
+  defaultServiceAnswers,
+  findServiceForm,
+  sanitizeServiceAnswers,
+  validateServiceAnswers,
+  serviceLabel,
+  isSnowService,
+} from '../shared/serviceForms';
+import ServiceFields, { type ServiceFieldIssue } from './ServiceFields';
+import ServiceScope from './ServiceScope';
 import AgreementHistory from './AgreementHistory';
 import Mailbox from './Mailbox';
 import ProcurementFlow, { type FlowTarget } from './ProcurementFlow';
+
+const serviceId = (spec: ProcurementSpec) => ('formId' in spec ? spec.formId : 'snow');
 
 type Notice = { kind: 'success' | 'error'; text: string } | null;
 type Operations = {
@@ -247,7 +263,7 @@ function TestNotice({ compact = false }: { compact?: boolean }) {
         <strong>TESTMAKSE · Tegelikku raha ei liigu</strong>
         {!compact && (
           <p>
-            Tagatisraha maksed, tagastused ja väljamaksed on simuleeritud. Hooaja ülejäänud tasu
+            Tagatisraha maksed, tagastused ja väljamaksed on simuleeritud. Teenuse ülejäänud tasu
             arveldatakse otse teenusepakkujaga.
           </p>
         )}
@@ -443,8 +459,8 @@ export default function App() {
               <div className="guide-icon">
                 <Snowflake size={24} />
               </div>
-              <strong>Talveks valmis, üheskoos.</strong>
-              <p>Ühine oma naabritega ja telli lumekoristus soodsama hinnaga.</p>
+              <strong>Naabritega koos, soodsamalt.</strong>
+              <p>Ühine oma naabritega ja telli ühistule vajalik teenus soodsama hinnaga.</p>
               <a href="#procurements">
                 Vaata hankeid <ArrowRight size={15} />
               </a>
@@ -608,7 +624,7 @@ export default function App() {
               <footer className="footer">
                 <span>© {new Date().getFullYear()} Ühishange</span>
                 <span>
-                  Mustamäe lumekoristuse piloot <span className="footer-dot">·</span> Eesti aeg
+                  Mustamäe ühishangete piloot <span className="footer-dot">·</span> Eesti aeg
                 </span>
                 <span>
                   <ShieldCheck size={13} /> Turvaline testkeskkond
@@ -666,7 +682,10 @@ function Auth({ onLogin }: { onLogin: () => Promise<void> }) {
             <br />
             <span>ühine hind.</span>
           </h1>
-          <p>Ühendame naaberühistud, et lumekoristus oleks lihtsam, läbipaistvam ja soodsam.</p>
+          <p>
+            Ühendame naaberühistud, et ühiste teenuste tellimine oleks lihtsam, läbipaistvam ja
+            soodsam.
+          </p>
           <div className="auth-benefits">
             <div>
               <Users size={21} />
@@ -837,10 +856,10 @@ function Overview({
         <div className="hero-copy">
           <span className="hero-badge">
             <Snowflake size={14} />
-            LUMEKORISTUS · MUSTAMÄE
+            ÜHISHANKED · MUSTAMÄE
           </span>
           <h2>
-            Talv tuleb.
+            Koos on lihtsam.
             <br />
             <span>Valmistume koos.</span>
           </h2>
@@ -884,7 +903,7 @@ function Overview({
               <Users size={18} />
             </div>
             <span>
-              Ühine jõud<strong>Parem hooaja hind</strong>
+              Ühine jõud<strong>Parem ühine hind</strong>
             </span>
             <ArrowDownLeft size={24} />
           </div>
@@ -1026,10 +1045,11 @@ function ProcurementCard({ procurement }: { procurement: Procurement }) {
     <a href={`#procurement/${procurement.id}`} className="procurement-card">
       <div className="procurement-card-top">
         <span className="snow-icon">
-          <Snowflake size={21} />
+          {isSnowService(procurement.spec) ? <Snowflake size={21} /> : <Layers3 size={21} />}
         </span>
         <Status status={procurement.status} />
       </div>
+      <span className="service-badge">{serviceLabel(procurement.spec)}</span>
       <h3>{procurement.title}</h3>
       <p className="procurement-address">
         <MapPin size={14} />
@@ -1045,7 +1065,9 @@ function ProcurementCard({ procurement }: { procurement: Procurement }) {
         </div>
         <div>
           <strong>{euro(procurement.bestPriceCents)}</strong>
-          <span>Hooaja hind / ühistu</span>
+          <span>
+            {isSnowService(procurement.spec) ? 'Hooaja hind / ühistu' : 'Teenuse hind / ühistu'}
+          </span>
         </div>
       </div>
       <div className="procurement-card-bottom">
@@ -1076,11 +1098,13 @@ function Procurements({
   );
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState('all');
+  const [category, setCategory] = useState('all');
   const rows = (data?.procurements || []).filter(
     (item) =>
-      `${item.title} ${item.organizationName}`
+      `${item.title} ${item.organizationName} ${serviceLabel(item.spec)}`
         .toLocaleLowerCase('et')
         .includes(search.toLocaleLowerCase('et')) &&
+      (category === 'all' || serviceId(item.spec) === category) &&
       (filter === 'all' ||
         (filter === 'open' && ['OPEN', 'SUCCEEDED'].includes(item.status)) ||
         (filter === 'own' && item.organizationId === organization?.id) ||
@@ -1092,7 +1116,7 @@ function Procurements({
         <div>
           <span className="eyebrow">KOOSTÖÖ ALGAB SIIT</span>
           <h1>Ühishanked</h1>
-          <p>Leia oma ühistule sobiv lumekoristuse hange või kutsu naabrid enda omasse.</p>
+          <p>Leia oma ühistule sobiva teenuse hange või kutsu naabrid enda omasse.</p>
         </div>
         {organization?.orgType === 'BUYER' && representative && (
           <a href="#new" className="button button-primary">
@@ -1130,6 +1154,21 @@ function Procurements({
             />
           </label>
         </div>
+        <div className="category-filter">
+          <label htmlFor="procurement-category">Hanketüüp</label>
+          <select
+            id="procurement-category"
+            value={category}
+            onChange={(event) => setCategory(event.target.value)}
+          >
+            <option value="all">Kõik hanketüübid</option>
+            {SERVICE_FORMS.map((form) => (
+              <option key={form.id} value={form.id}>
+                {form.label}
+              </option>
+            ))}
+          </select>
+        </div>
         <LoadState loading={loading} error={error}>
           {rows.length ? (
             <div className="procurement-cards all-cards">
@@ -1156,35 +1195,47 @@ function NewProcurement({
   representative: boolean;
 }) {
   const { run } = useOperations();
+  const [formId, setFormId] = useState<ServiceFormId>('snow');
+  const formDefinition = findServiceForm(formId)!;
+  const [answers, setAnswers] = useState<ServiceAnswers>(() =>
+    defaultServiceAnswers('snow', organization?.address),
+  );
+  const [issues, setIssues] = useState<ServiceFieldIssue[]>([]);
+  useEffect(() => {
+    setAnswers(defaultServiceAnswers(formId, organization?.address));
+    setIssues([]);
+  }, [organization?.id, formId]);
   const submit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     if (!organization) return;
+    const submittedAnswers = sanitizeServiceAnswers(formDefinition, answers);
+    const validation = validateServiceAnswers(formDefinition, submittedAnswers);
+    setIssues(validation);
+    if (validation.length) {
+      requestAnimationFrame(() => {
+        const first = document.getElementById('service-' + validation[0].fieldId);
+        const control = first instanceof HTMLFieldSetElement ? first.querySelector('input') : first;
+        control?.focus();
+        control?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+      });
+      return;
+    }
+    if (!event.currentTarget.reportValidity()) return;
     const form = new FormData(event.currentTarget);
     const text = (name: string) => String(form.get(name) || '');
-    const number = (name: string) => Number(form.get(name));
     run(
       () =>
         api<{ procurement: Procurement }>('/procurements', {
           organizationId: organization.id,
           title: text('title'),
           description: text('description'),
-          radiusM: number('radiusM'),
+          radiusM: Number(form.get('radiusM')),
           joinDeadlineAt: utcDateTime(text('deadline')),
-          spec: {
-            seasonStart: text('seasonStart'),
-            seasonEnd: text('seasonEnd'),
-            areaM2: number('areaM2'),
-            parkingM2: number('parkingM2'),
-            walkwayM: number('walkwayM'),
-            triggerCm: number('triggerCm'),
-            responseHours: number('responseHours'),
-            gritting: form.has('gritting'),
-            snowHauling: form.has('snowHauling'),
-          },
+          spec: { formId, version: formDefinition.version, answers: submittedAnswers },
         }),
       'Hanke mustand on salvestatud. Avalda see, kui tingimused on valmis.',
       ({ procurement }) => {
-        window.location.hash = `procurement/${procurement.id}`;
+        window.location.hash = 'procurement/' + procurement.id;
       },
     );
   };
@@ -1194,7 +1245,6 @@ function NewProcurement({
         <a href="#organization">Vaata organisatsiooni ja taotle esindusõigust.</a>
       </Empty>
     );
-  const thisYear = new Date().getFullYear();
   return (
     <>
       <a href="#procurements" className="back-link">
@@ -1204,19 +1254,34 @@ function NewProcurement({
       <div className="page-heading">
         <div>
           <span className="eyebrow">KUTSU NAABRID KAASA</span>
-          <h1>Uus lumekoristuse hange</h1>
-          <p>Määra ühine teenuse ulatus. Iga liituja kinnitab, et see sobib tema ühistule.</p>
+          <h1>{formId === 'snow' ? 'Uus lumekoristuse hange' : 'Uus ühishange'}</h1>
+          <p>
+            Vali teenus ja määra ühine tööde ulatus. Iga liituja kinnitab, et see sobib tema
+            ühistule.
+          </p>
         </div>
         <span className="pill">{organization.name}</span>
       </div>
-      <form onSubmit={submit} className="form-layout">
+      <form onSubmit={submit} className="form-layout" noValidate>
         <div>
           <section className="card form-card">
             <SectionHeading title="Hanke põhiandmed" />
+            <Field label="Hanketüüp">
+              <select
+                value={formId}
+                onChange={(event) => setFormId(event.target.value as ServiceFormId)}
+              >
+                {SERVICE_FORMS.map((form) => (
+                  <option value={form.id} key={form.id}>
+                    {form.label}
+                  </option>
+                ))}
+              </select>
+            </Field>
             <Field label="Hanke pealkiri">
               <input
                 name="title"
-                placeholder="Näiteks: Sõpruse piirkonna talvine lumekoristus"
+                placeholder="Näiteks: Naaberühistute ühine teenus Mustamäel"
                 minLength={3}
                 maxLength={160}
                 required
@@ -1257,73 +1322,25 @@ function NewProcurement({
             </div>
           </section>
           <section className="card form-card">
-            <SectionHeading title="Ühine teenuse ulatus" />
-            <div className="field-grid">
-              <Field label="Hooaja algus">
-                <input name="seasonStart" type="date" defaultValue={`${thisYear}-11-01`} required />
-              </Field>
-              <Field label="Hooaja lõpp">
-                <input
-                  name="seasonEnd"
-                  type="date"
-                  defaultValue={`${thisYear + 1}-04-01`}
-                  required
-                />
-              </Field>
-              <Field label="Koristusala (m²)">
-                <input
-                  name="areaM2"
-                  type="number"
-                  min={1}
-                  max={1000000}
-                  defaultValue={600}
-                  required
-                />
-              </Field>
-              <Field label="Parkimisala (m²)">
-                <input
-                  name="parkingM2"
-                  type="number"
-                  min={0}
-                  max={1000000}
-                  defaultValue={200}
-                  required
-                />
-              </Field>
-              <Field label="Kõnnitee (m)">
-                <input
-                  name="walkwayM"
-                  type="number"
-                  min={0}
-                  max={100000}
-                  defaultValue={80}
-                  required
-                />
-              </Field>
-              <Field label="Lumekihi paksus (cm)" hint="Millal koristamine algab?">
-                <input name="triggerCm" type="number" min={1} max={100} defaultValue={3} required />
-              </Field>
-              <Field label="Reageerimisaeg (h)">
-                <input
-                  name="responseHours"
-                  type="number"
-                  min={1}
-                  max={168}
-                  defaultValue={4}
-                  required
-                />
-              </Field>
-            </div>
-            <div className="checkbox-row">
-              <label className="checkbox">
-                <input type="checkbox" name="gritting" defaultChecked />
-                <span>Libedusetõrje</span>
-              </label>
-              <label className="checkbox">
-                <input type="checkbox" name="snowHauling" />
-                <span>Lume äravedu</span>
-              </label>
-            </div>
+            <SectionHeading title="Ühine teenuse ulatus">
+              <span className="service-badge">{formDefinition.label}</span>
+            </SectionHeading>
+            {issues.length > 0 && (
+              <p className="inline-error" role="alert">
+                Kontrolli märgitud teenuse välju.
+              </p>
+            )}
+            <ServiceFields
+              form={formDefinition}
+              answers={answers}
+              issues={issues}
+              onChange={(fieldId, value) => {
+                setAnswers(
+                  sanitizeServiceAnswers(formDefinition, { ...answers, [fieldId]: value }),
+                );
+                setIssues([]);
+              }}
+            />
           </section>
           <div className="form-actions">
             <a href="#procurements" className="button button-secondary">
@@ -1337,12 +1354,12 @@ function NewProcurement({
         </div>
         <aside className="card form-aside">
           <div className="small-icon">
-            <Snowflake size={25} />
+            {formId === 'snow' ? <Snowflake size={25} /> : <Layers3 size={25} />}
           </div>
           <h3>Hea hange on selge.</h3>
           <p>
-            Need tingimused kehtivad igale osalevale ühistule. Pakkumise hinnad on ühe ühistu kogu
-            hooaja brutohinnad.
+            Need tingimused kehtivad igale osalevale ühistule. Pakkuja esitab kogu kirjeldatud
+            teenuse brutohinna ühe ühistu kohta ka ühikuhinna soovi korral.
           </p>
           <div className="aside-note">
             <MapPin size={18} />
@@ -1454,7 +1471,9 @@ function ProcurementPage({
       <div className="page-heading detail-heading">
         <div>
           <div className="heading-meta">
-            <span className="eyebrow">LUMEKORISTUSE ÜHISHANGE</span>
+            <span className="eyebrow">
+              {serviceLabel(procurement.spec).toLocaleUpperCase('et')} · ÜHISHANGE
+            </span>
             <Status status={procurement.status} />
           </div>
           <h1>{procurement.title}</h1>
@@ -1537,28 +1556,7 @@ function ProcurementPage({
               <section className="card detail-description">
                 <SectionHeading title="Ühise hanke eesmärk" />
                 <p className="preserve-lines">{procurement.description}</p>
-                <div className="scope-grid">
-                  <Scope
-                    label="Hooaeg"
-                    value={`${date(procurement.spec.seasonStart)} – ${date(procurement.spec.seasonEnd)}`}
-                  />
-                  <Scope label="Koristusala" value={`${procurement.spec.areaM2} m²`} />
-                  <Scope label="Parkimisala" value={`${procurement.spec.parkingM2} m²`} />
-                  <Scope label="Kõnnitee" value={`${procurement.spec.walkwayM} m`} />
-                  <Scope
-                    label="Koristamise algus"
-                    value={`${procurement.spec.triggerCm} cm lumekiht`}
-                  />
-                  <Scope label="Reageerimisaeg" value={`${procurement.spec.responseHours} tundi`} />
-                  <Scope
-                    label="Libedusetõrje"
-                    value={procurement.spec.gritting ? 'Sisaldub' : 'Ei sisaldu'}
-                  />
-                  <Scope
-                    label="Lume äravedu"
-                    value={procurement.spec.snowHauling ? 'Sisaldub' : 'Ei sisaldu'}
-                  />
-                </div>
+                <ServiceScope spec={procurement.spec} />
                 <p className="scope-note">
                   <ShieldCheck size={16} />
                   Ühine teenuse ulatus kehtib igale liituvale ühistule.
@@ -1594,7 +1592,10 @@ function ProcurementPage({
                         <div>
                           <strong>{contract.organizationName}</strong>
                           <small>
-                            Hooaja lõpphind {euro(contract.priceCents)} · Tagatisraha arvestatud{' '}
+                            {isSnowService(procurement.spec)
+                              ? 'Hooaja lõpphind'
+                              : 'Teenuse lõpphind'}{' '}
+                            {euro(contract.priceCents)} · Tagatisraha arvestatud{' '}
                             {euro(contract.depositCreditCents)}
                           </small>
                         </div>
@@ -1613,8 +1614,9 @@ function ProcurementPage({
             <>
               <SectionHeading title="Teenusepakkujate pakkumised" />
               <p className="muted">
-                Kõik hinnad on ühe ühistu kogu hooaja brutohinnad. Esimene hinnatase määrab hanke
-                õnnestumiseks vajaliku osalejate arvu.
+                Kõik hinnad on ühe ühistu{' '}
+                {isSnowService(procurement.spec) ? 'kogu hooaja' : 'kogu teenuse'} brutohinnad.
+                Esimene hinnatase määrab hanke õnnestumiseks vajaliku osalejate arvu.
               </p>
               {offers.length ? (
                 offers.map((offer) => (
@@ -1735,10 +1737,14 @@ function ProcurementPage({
         </div>
         <aside className="detail-aside">
           <section className="card price-summary">
-            <span className="eyebrow">ÜHE ÜHISTU HOOAJA BRUTOHIND</span>
+            <span className="eyebrow">
+              {isSnowService(procurement.spec)
+                ? 'ÜHE ÜHISTU HOOAJA BRUTOHIND'
+                : 'ÜHE ÜHISTU TEENUSE BRUTOHIND'}
+            </span>
             <div className="summary-price" data-testid="current-price">
               {euro(procurement.bestPriceCents ?? selected?.basePriceCents)}
-              <small>/ hooaeg</small>
+              <small>{isSnowService(procurement.spec) ? '/ hooaeg' : '/ kogu teenus'}</small>
             </div>
             {selected ? (
               <>
@@ -1876,7 +1882,9 @@ function OfferCard({
         <div className="tier base-tier">
           <span>Tavahind</span>
           <strong>{euro(offer.basePriceCents)}</strong>
-          <small>ühe ühistu hooaeg</small>
+          <small>
+            {isSnowService(procurement.spec) ? 'ühe ühistu hooaeg' : 'ühe ühistu kogu teenus'}
+          </small>
         </div>
         {offer.tiers.map((tier, index) => (
           <div
@@ -1961,12 +1969,17 @@ function OfferForm({
           <div className="info-banner">
             <Euro size={20} />
             <span>
-              Hinnad on ühe ühistu hooaja brutohinnad. Osalejate arv peab kasvama ja hinnad saavad
-              ainult langeda. Tagatis ei või ületada odavaimat hinnataset.
+              Hinnad on ühe ühistu {isSnowService(procurement.spec) ? 'hooaja' : 'kogu teenuse'}{' '}
+              brutohinnad. Osalejate arv peab kasvama ja hinnad saavad ainult langeda. Tagatis ei
+              või ületada odavaimat hinnataset.
             </span>
           </div>
           <div className="field-grid">
-            <Field label="Hooaja tavahind (€)">
+            <Field
+              label={
+                isSnowService(procurement.spec) ? 'Hooaja tavahind (€)' : 'Teenuse tavahind (€)'
+              }
+            >
               <input name="basePrice" type="number" step="0.01" min="0.01" required />
             </Field>
             <Field label="Tagatisraha (€)">
@@ -2007,7 +2020,9 @@ function OfferForm({
                     }
                   />
                 </Field>
-                <Field label={`Hooaja hind (€)${index ? ` ${index + 1}` : ''}`}>
+                <Field
+                  label={`${isSnowService(procurement.spec) ? 'Hooaja' : 'Teenuse'} hind (€)${index ? ` ${index + 1}` : ''}`}
+                >
                   <input
                     type="number"
                     min="0.01"
@@ -2065,7 +2080,7 @@ function OfferForm({
         </form>
       ) : (
         <p className="muted">
-          Esita ühistutele ühine lumekoristuse pakkumine koos osalejate arvust sõltuvate hindadega.
+          Esita ühistutele ühine teenuse pakkumine koos osalejate arvust sõltuvate hindadega.
         </p>
       )}
     </section>
@@ -2231,7 +2246,8 @@ function JoinPanel({
         <>
           <p>
             Liitud organisatsiooni <strong>{organization.name}</strong> nimel. Tagatisraha
-            arvestatakse täies ulatuses hooaja tasu sisse.
+            arvestatakse täies ulatuses {isSnowService(procurement.spec) ? 'hooaja' : 'teenuse'}{' '}
+            tasu sisse.
           </p>
           <label className="checkbox block-checkbox">
             <input
@@ -2654,7 +2670,12 @@ function ContractCard({ contract, canComplete }: { contract: Contract; canComple
         </span>
       </div>
       <div className="contract-money">
-        <Scope label="Hooaja lõpphind" value={euro(contract.priceCents)} />
+        <Scope
+          label={
+            isSnowService(contract.finalSnapshot.spec) ? 'Hooaja lõpphind' : 'Teenuse lõpphind'
+          }
+          value={euro(contract.priceCents)}
+        />
         <Scope label="Testtagatis arvestatud" value={euro(contract.depositCreditCents)} />
         <Scope
           label={
@@ -2669,7 +2690,7 @@ function ContractCard({ contract, canComplete }: { contract: Contract; canComple
         <Euro size={16} />
         {contract.status === 'CANCELLED'
           ? 'Leping on tühistatud. Varasem hinnaarvestus säilib ajaloona.'
-          : 'Ülejäänud hooajatasu arveldatakse väljaspool seda pilooti otse teenusepakkujaga.'}
+          : 'Ülejäänud teenuse tasu arveldatakse väljaspool seda pilooti otse teenusepakkujaga.'}
       </p>
       <div className="contract-actions">
         <a href={`#procurement/${contract.procurementId}`} className="text-link">
@@ -2739,12 +2760,7 @@ function ContractCard({ contract, canComplete }: { contract: Contract; canComple
             </select>
           </Field>
           <Field label="Kommentaar">
-            <textarea
-              name="comment"
-              rows={3}
-              maxLength={2000}
-              placeholder="Kuidas lumekoristuse teenus sujus?"
-            />
+            <textarea name="comment" rows={3} maxLength={2000} placeholder="Kuidas teenus sujus?" />
           </Field>
           <div className="button-row">
             <Button type="button" variant="secondary" onClick={() => setCompleting(false)}>

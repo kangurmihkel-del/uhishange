@@ -4,6 +4,7 @@ import type {
   Contract,
   Offer,
   Procurement,
+  ProcurementSpec,
   SessionResponse,
 } from '../../src/shared/types.js';
 
@@ -36,6 +37,13 @@ export async function navigate(page: Page, name: string | RegExp) {
     .getByRole('link', { name, exact: true })
     .click();
 }
+
+/** Source question text stays stable while a decorative star marks required controls. */
+export function serviceField(page: Page, label: string) {
+  const escaped = label.replace(/[.*+?^{}()|[\]\\$]/g, '\\$&');
+  return page.getByLabel(new RegExp('^' + escaped + '(?:\\s*\\*)?$'));
+}
+
 export async function nextAction(page: Page, name: string) {
   await expect(page.getByTestId('procurement-flow')).toBeVisible();
   const action = page.getByTestId('next-action');
@@ -60,7 +68,7 @@ export async function api<T>(request: APIRequestContext, path: string, data?: un
 }
 
 /** Prepare a contract through public operations and the actual durable processor. */
-export async function finalizedFixture(request: APIRequestContext) {
+export async function finalizedFixture(request: APIRequestContext, spec?: ProcurementSpec) {
   const session = await api<SessionResponse>(request, '/login', {
     email: 'buyer1@demo.test',
     password: testPassword,
@@ -79,7 +87,7 @@ export async function finalizedFixture(request: APIRequestContext) {
     description: 'Valmis lepingu ja hinnangu kontroll.',
     radiusM: 500,
     joinDeadlineAt: deadline,
-    spec: {
+    spec: spec ?? {
       seasonStart: year + '-11-01',
       seasonEnd: year + 1 + '-04-01',
       areaM2: 300,

@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { parse } from 'csv-parse/sync';
 import type { ImportPreview, ImportRow } from '../shared/types.js';
 import { DEFAULT_RADIUS_M } from '../shared/constants.js';
+import { findServiceForm, validateServiceAnswers } from '../shared/serviceForms.js';
 
 const integer = z.number().int().nonnegative().max(100000000);
 const coordinate = {
@@ -43,7 +44,7 @@ const calendarDate = z
       !Number.isNaN(Date.parse(value)) && new Date(value).toISOString().slice(0, 10) === value,
     'Kuupäev ei ole kehtiv.',
   );
-export const specSchema = z
+const legacySnowSpecSchema = z
   .object({
     seasonStart: calendarDate,
     seasonEnd: calendarDate,
@@ -57,6 +58,36 @@ export const specSchema = z
   })
   .strict()
   .refine((spec) => spec.seasonEnd > spec.seasonStart, 'Hooaja lõpp peab olema pärast algust.');
+export const serviceSpecSchema = z
+  .object({
+    formId: z.enum(['snow', 'pest', 'energy', 'branches', 'other']),
+    version: z.literal(1),
+    answers: z.record(
+      z.string().max(80),
+      z.union([
+        z.string().max(10000),
+        z.number().finite(),
+        z.boolean(),
+        z.array(z.string().max(200)).max(30),
+      ]),
+    ),
+  })
+  .strict()
+  .superRefine((spec, ctx) => {
+    const form = findServiceForm(spec.formId, spec.version);
+    if (!form) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['formId'],
+        message: 'Tundmatu vorm või vormi versioon.',
+      });
+      return;
+    }
+    for (const issue of validateServiceAnswers(form, spec.answers)) {
+      ctx.addIssue({ code: 'custom', path: ['answers', issue.fieldId], message: issue.message });
+    }
+  });
+export const specSchema = z.union([legacySnowSpecSchema, serviceSpecSchema]);
 export const procurementSchema = z
   .object({
     organizationId: uuidSchema,

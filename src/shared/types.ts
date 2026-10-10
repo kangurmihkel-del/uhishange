@@ -45,6 +45,15 @@ export interface SnowSpec {
   gritting: boolean;
   snowHauling: boolean;
 }
+export type ServiceFormId = 'snow' | 'pest' | 'energy' | 'branches' | 'other';
+export type ServiceAnswer = string | number | boolean | string[];
+export type ServiceAnswers = Record<string, ServiceAnswer>;
+export interface ServiceSpec {
+  formId: ServiceFormId;
+  version: 1;
+  answers: ServiceAnswers;
+}
+export type ProcurementSpec = SnowSpec | ServiceSpec;
 export interface PriceTier {
   minParticipants: number;
   priceCents: number;
@@ -53,7 +62,7 @@ export interface AgreementSnapshot {
   procurementId: string;
   title: string;
   description: string;
-  spec: SnowSpec;
+  spec: ProcurementSpec;
   locationLatitude: number;
   locationLongitude: number;
   initiatorOrganization: Organization;
@@ -94,7 +103,7 @@ export interface Procurement {
   description: string;
   radiusM: number;
   joinDeadlineAt: string;
-  spec: SnowSpec;
+  spec: ProcurementSpec;
   status: ProcurementStatus;
   locationLatitude: number;
   locationLongitude: number;
