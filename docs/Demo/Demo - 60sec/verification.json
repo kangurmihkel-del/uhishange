@@ -1,0 +1,52 @@
+{
+  "recordedAt": "2026-10-10T17:54:53.410Z",
+  "databaseName": "uhishange_role_demo_1791654819758",
+  "procurementId": "ae4a1cae-1558-42b8-8dec-1582c60eb2fd",
+  "excludesAdministrator": true,
+  "roles": {
+    "client": "♔",
+    "supplier": "♞"
+  },
+  "supplierOfferFieldsPrefilled": true,
+  "mode": "concise",
+  "naturallyPacedNavigation": true,
+  "offerSubmissionSpotlightSeconds": 8,
+  "browserErrors": [],
+  "procurement": {
+    "status": "OPEN",
+    "selected_offer_id": "bea0d65e-7116-41ac-ae27-3c3699e8c7b2"
+  },
+  "media": {
+    "codec": "h264",
+    "width": 1440,
+    "height": 900,
+    "seconds": 60,
+    "fullDecodePassed": true
+  },
+  "chapters": [
+    {
+      "title": "♔ KLIENT · ÜHISTU: Ühishanke töölaud",
+      "sourceSeconds": 0.112
+    },
+    {
+      "title": "♔ KLIENT · ÜHISTU: Klient valib ühistud",
+      "sourceSeconds": 15.881
+    },
+    {
+      "title": "♞ HANKIJA · TEENUSEPAKKUJA: Eeltäidetud pakkumine",
+      "sourceSeconds": 23.522
+    },
+    {
+      "title": "♞ HANKIJA · TEENUSEPAKKUJA: Pakkumine on saatmiseks valmis",
+      "sourceSeconds": 34.181
+    },
+    {
+      "title": "♔ KLIENT · ÜHISTU: Klient võrdleb ja valib",
+      "sourceSeconds": 45.449
+    },
+    {
+      "title": "♔ KLIENT · ÜHISTU: Ühine hange on valmis liitumiseks",
+      "sourceSeconds": 59.567
+    }
+  ]
+}

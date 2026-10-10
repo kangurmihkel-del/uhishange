@@ -20,18 +20,20 @@ const concise = mode === 'concise';
 const targetSeconds = concise ? 60 : 90;
 const timings = concise
   ? {
-      request: 4000,
+      introduction: 5000,
+      request: 3000,
       neighbors: 4000,
       offer: 5000,
-      sendFocus: 10000,
+      sendFocus: 8000,
       comparison: 5000,
       selected: 4000,
     }
   : {
-      request: 8000,
+      introduction: 7000,
+      request: 7000,
       neighbors: 8000,
       offer: 9000,
-      sendFocus: 15000,
+      sendFocus: 12000,
       comparison: 9000,
       selected: 7000,
     };
@@ -292,9 +294,10 @@ try {
   await stage(
     'KLIENT · ÜHISTU',
     '♔',
-    'Hankesoov naabritega koos',
-    'Klient algatab ühise tellimuse. Vorm on eeltäidetud.',
+    'Ühishanke töölaud',
+    'Selles demos algatab klient hanke, valib naabrid kaardilt ja võrdleb pakkumist.',
   );
+  await pause(timings.introduction);
   await login('Ostja');
   await click(page.getByRole('link', { name: 'Uus hange', exact: true }));
   const deadline = new Date(Date.now() + 10 * 60 * 1000);
