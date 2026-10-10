@@ -786,9 +786,13 @@ test('source service types use conditional questions, clear stale answers and re
     await filter.selectOption(item.formId);
     const cards = page.locator('.procurement-card');
     await expect(cards.filter({ hasText: item.title })).toHaveCount(1);
-    const badges = await cards.locator('.service-badge').allTextContents();
-    expect(badges.length).toBeGreaterThan(0);
-    expect(badges.every((label) => label === item.label)).toBe(true);
+    // Publishing may still be refreshing the list; inspect the settled filtered cards.
+    await expect
+      .poll(async () => {
+        const badges = await cards.locator('.service-badge').allTextContents();
+        return badges.length > 0 && badges.every((label) => label === item.label);
+      })
+      .toBe(true);
     await expectResponsive(page);
   }
   await filter.selectOption('all');

@@ -692,7 +692,7 @@ function Auth({ onLogin }: { onLogin: () => Promise<void> }) {
     event.preventDefault();
     const section = document.getElementById(sectionId);
     section?.focus({ preventScroll: true });
-    section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    section?.scrollIntoView({ behavior: 'instant', block: 'start' });
   };
   const startProcurement = () => {
     setRegister(true);
@@ -701,7 +701,7 @@ function Auth({ onLogin }: { onLogin: () => Promise<void> }) {
         '#account-form input[autocomplete="name"]',
       );
       input?.focus({ preventScroll: true });
-      input?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      input?.scrollIntoView({ behavior: 'instant', block: 'center' });
     });
   };
   return (

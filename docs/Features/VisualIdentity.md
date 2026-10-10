@@ -11,3 +11,5 @@ Participation uses filled/unfilled dots, exact confirmed-paid counts and a reada
 The CVI's illustrative per-visit prices and simplified process are visual examples. The implemented pilot retains gross whole-service prices per association, supplier selection before commitments, paid-only participation, TEST financial labels, locked history and its existing five-stage next-action flow. No business or database changes are required.
 
 Acceptance: public navigation and CTA reach visible content/forms; locally bundled fonts actually load; participation displays exact paid counts and latched success; all existing buyer/supplier/admin/viewer workflows remain usable on desktop/mobile; no horizontal overflow or browser errors; visually inspect public entry, dashboard, procurement/map, mailbox, forms, contracts and administration.
+
+Public information links and the account CTA reveal their focus target immediately. Successive activations must not leave the target offscreen by interrupting an earlier scrolling animation; link destinations and application routing remain unchanged.
