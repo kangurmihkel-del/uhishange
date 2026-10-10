@@ -12,7 +12,11 @@ import type {
   Procurement,
   SessionResponse,
   ServiceSpec,
+  AgreementSnapshot,
+  FeePolicy,
+  PriceTier,
 } from '../../src/shared/types.js';
+import { CURRENT_FEE_POLICY } from '../../src/shared/pricing.js';
 import {
   Client,
   capture,
@@ -52,6 +56,52 @@ async function ledger(procurementId: string) {
 async function finalize() {
   const { processDueProcurements } = await import('../../src/server/domain.js');
   await processDueProcurements();
+}
+
+// Insert an already frozen pre-upgrade agreement before API commitments are created.
+// Immutable acceptance/contract snapshots and production rules are never bypassed.
+async function historicalSelectedProcurement(options: {
+  deadline: string;
+  deposit: number;
+  feeBasisPoints: number;
+  tiers?: PriceTier[];
+  feePolicy?: FeePolicy;
+}) {
+  const selected = await selectedProcurement(runtime, {
+    deadline: options.deadline,
+    tiers: options.tiers,
+  });
+  const { procurement: p, offer } = selected;
+  const snapshot: AgreementSnapshot = {
+    procurementId: p.id,
+    title: p.title,
+    description: p.description,
+    spec: p.spec,
+    locationLatitude: p.locationLatitude,
+    locationLongitude: p.locationLongitude,
+    initiatorOrganization: runtime.buyers[0].organization,
+    supplierOrganization: runtime.supplier.organization,
+    joinDeadlineAt: p.joinDeadlineAt,
+    supplierOrganizationId: offer.organizationId,
+    offerId: offer.id,
+    basePriceCents: offer.basePriceCents,
+    depositCents: options.deposit,
+    tiers: offer.tiers,
+    terms: offer.terms,
+    feeBasisPoints: options.feeBasisPoints,
+    ...(options.feePolicy ? { feePolicy: options.feePolicy } : {}),
+    currency: 'EUR',
+    paymentMode: 'TEST',
+  };
+  await runtime.pool.query('UPDATE offers SET deposit_cents=$2 WHERE id=$1', [
+    offer.id,
+    options.deposit,
+  ]);
+  await runtime.pool.query(
+    'UPDATE procurements SET frozen_at=clock_timestamp(),frozen_snapshot=$2 WHERE id=$1',
+    [p.id, JSON.stringify(snapshot)],
+  );
+  return selected;
 }
 
 async function mailbox(client: Client, procurementId?: string, kind?: MailboxMessageKind) {
@@ -299,6 +349,7 @@ describe('discovery, invitations and offer selection', () => {
     );
     const accepted = await commit(runtime.buyers[0], selected.id);
     expect(accepted.status).toBe('PENDING');
+    expect(accepted.acceptanceSnapshot.feePolicy).toEqual(CURRENT_FEE_POLICY);
     const d = await detail(runtime.buyers[0], selected.id);
     expect(d.procurement.frozenAt).not.toBeNull();
     expect(d.procurement.activeCount).toBe(0);
@@ -567,6 +618,214 @@ describe('durable organization mailbox', () => {
   });
 });
 
+describe('versioned service-fee acceptance and finalization', () => {
+  it('requires deposit coverage of the highest participant tier, preserves the cheapest-price cap and rejects unsafe old unfrozen offers', async () => {
+    const p = await procurement(runtime.buyers[0]);
+    await runtime.buyers[0].post('/procurements/' + p.id + '/publish');
+    const input = {
+      organizationId: runtime.supplier.organization.id,
+      basePriceCents: 100_000,
+      depositCents: 3_600,
+      terms: 'Gross supplier fee is included in the offer.',
+      validUntil: future(),
+      tiers: [
+        { minParticipants: 1, priceCents: 90_000 },
+        { minParticipants: 2, priceCents: 70_000 },
+      ],
+    };
+    for (const invalid of [
+      { tiers: [] },
+      ...[-1, 0, 0.5, Number.MAX_SAFE_INTEGER + 1, 100_000_001].map((priceCents) => ({
+        tiers: [{ minParticipants: 1, priceCents }],
+      })),
+      { depositCents: -1 },
+      { basePriceCents: -1 },
+    ]) {
+      const invalidError = await runtime.supplier.error(
+        'POST',
+        '/procurements/' + p.id + '/offers',
+        { ...input, ...invalid },
+        400,
+      );
+      expect(invalidError.code).toBe('VALIDATION_ERROR');
+    }
+    expect((await detail(runtime.admin, p.id)).offers).toHaveLength(0);
+    const error = await runtime.supplier.error(
+      'POST',
+      '/procurements/' + p.id + '/offers',
+      { ...input, depositCents: 3_599 },
+      400,
+    );
+    expect(error.message).toContain('36,00');
+    await runtime.supplier.error(
+      'POST',
+      '/procurements/' + p.id + '/offers',
+      {
+        ...input,
+        depositCents: 3_600,
+        tiers: [
+          { minParticipants: 1, priceCents: 90_000 },
+          { minParticipants: 2, priceCents: 2_000 },
+        ],
+      },
+      400,
+    );
+    await runtime.supplier.error(
+      'POST',
+      '/procurements/' + p.id + '/offers',
+      { ...input, depositCents: 999, tiers: [{ minParticipants: 1, priceCents: 20_000 }] },
+      400,
+    );
+    const { offer } = await runtime.supplier.post<{ offer: Offer }>(
+      '/procurements/' + p.id + '/offers',
+      input,
+    );
+    await runtime.buyers[0].post('/procurements/' + p.id + '/select-offer', { offerId: offer.id });
+    // An unaccepted offer saved by an earlier portal version has no frozen pricing authority.
+    await runtime.pool.query('UPDATE offers SET deposit_cents=3500 WHERE id=$1', [offer.id]);
+    const rejected = await runtime.buyers[0].error(
+      'POST',
+      '/procurements/' + p.id + '/commitments',
+      {
+        organizationId: runtime.buyers[0].organization.id,
+        authorityConfirmed: true,
+        scopeConfirmed: true,
+      },
+      409,
+    );
+    expect(rejected.code).toBe('DEPOSIT_FEE_COVERAGE');
+    const unchanged = await detail(runtime.admin, p.id);
+    expect(unchanged.procurement.frozenAt).toBeNull();
+    expect(unchanged.commitments).toHaveLength(0);
+    expect(await ledger(p.id)).toEqual({});
+    await runtime.supplier.post('/procurements/' + p.id + '/offers', input);
+    const accepted = await commit(runtime.buyers[0], p.id);
+    expect(accepted.depositCents).toBe(3_600);
+    expect(accepted.acceptanceSnapshot.feePolicy).toEqual(CURRENT_FEE_POLICY);
+    expect((await detail(runtime.buyers[1], p.id)).procurement.feePolicy).toEqual(
+      CURRENT_FEE_POLICY,
+    );
+  });
+
+  it('deducts the gross EUR 10 minimum once, preserves full buyer credit and reverses exact allocations on cancellation', async () => {
+    const deadline = future(1_500);
+    const { procurement: p } = await selectedProcurement(runtime, {
+      deadline,
+      deposit: 1000,
+      tiers: [{ minParticipants: 1, priceCents: 19_000 }],
+    });
+    const accepted = await commit(runtime.buyers[0], p.id);
+    await capture(runtime.buyers[0], accepted.id);
+    await capture(runtime.buyers[0], accepted.id);
+    await waitUntil(deadline);
+    await finalize();
+    await finalize();
+    const after = await detail(runtime.admin, p.id);
+    expect(after.contracts).toHaveLength(1);
+    const contract = after.contracts[0];
+    expect(contract.priceCents).toBe(19_000);
+    expect(contract.depositCreditCents).toBe(1000);
+    expect(contract.balanceCents).toBe(18_000);
+    expect(contract.finalSnapshot.serviceFeeCents).toBe(1000);
+    expect(contract.finalSnapshot.supplierPayoutCents).toBe(0);
+    expect(after.commitments[0].acceptanceSnapshot).toEqual(accepted.acceptanceSnapshot);
+    const allocated = await ledger(p.id);
+    expect(allocated.PLATFORM_FEE).toEqual({ count: 1, total: 1000 });
+    expect(allocated.SUPPLIER_PAYOUT).toEqual({ count: 1, total: 0 });
+    await runtime.admin.post('/admin/procurements/' + p.id + '/cancel', {
+      reason: 'Supplier cancellation after minimum allocation.',
+    });
+    await runtime.admin.post('/admin/procurements/' + p.id + '/cancel', {
+      reason: 'Repeated cancellation.',
+    });
+    const reversed = await ledger(p.id);
+    expect(reversed.REFUND).toEqual({ count: 1, total: 1000 });
+    expect(reversed.FEE_REVERSAL).toEqual(allocated.PLATFORM_FEE);
+    expect(reversed.SUPPLIER_REVERSAL).toEqual(allocated.SUPPLIER_PAYOUT);
+    expect((await detail(runtime.admin, p.id)).contracts[0].finalSnapshot).toEqual(
+      contract.finalSnapshot,
+    );
+  });
+
+  it('honors a legacy custom frozen deposit rate for continuing and withdrawn buyers without rewriting acceptance history', async () => {
+    const deadline = future(1_500);
+    const { procurement: p } = await historicalSelectedProcurement({
+      deadline,
+      deposit: 10_003,
+      feeBasisPoints: 625,
+      tiers: [
+        { minParticipants: 1, priceCents: 90_000 },
+        { minParticipants: 2, priceCents: 70_000 },
+      ],
+    });
+    const first = await commit(runtime.buyers[0], p.id);
+    const second = await commit(runtime.buyers[1], p.id);
+    expect(first.acceptanceSnapshot.feePolicy).toBeUndefined();
+    expect(first.acceptanceSnapshot.feeBasisPoints).toBe(625);
+    expect((await detail(runtime.buyers[2], p.id)).procurement.feePolicy).toEqual({
+      version: 'deposit-v1',
+      basisPoints: 625,
+      minimumCents: 0,
+    });
+    await capture(runtime.buyers[0], first.id);
+    await capture(runtime.buyers[1], second.id);
+    await runtime.buyers[1].post('/commitments/' + second.id + '/withdraw');
+    await waitUntil(deadline);
+    await finalize();
+    await finalize();
+    const after = await detail(runtime.admin, p.id);
+    expect(after.contracts).toHaveLength(1);
+    expect(after.contracts[0].priceCents).toBe(70_000);
+    expect(after.contracts[0].finalSnapshot.feePolicy).toBeUndefined();
+    expect(after.contracts[0].finalSnapshot.serviceFeeCents).toBe(625);
+    expect(after.contracts[0].depositCreditCents).toBe(10_003);
+    expect(after.contracts[0].finalSnapshot.supplierPayoutCents).toBe(9_378);
+    expect(after.commitments.find((row) => row.id === first.id)?.acceptanceSnapshot).toEqual(
+      first.acceptanceSnapshot,
+    );
+    expect(after.commitments.find((row) => row.id === second.id)?.acceptanceSnapshot).toEqual(
+      second.acceptanceSnapshot,
+    );
+    const allocated = await ledger(p.id);
+    expect(allocated.PLATFORM_FEE).toEqual({ count: 2, total: 1250 });
+    expect(allocated.SUPPLIER_PAYOUT).toEqual({ count: 2, total: 18_756 });
+    expect(allocated.REFUND).toBeUndefined();
+  });
+
+  it('uses the explicitly frozen contract policy and its rate for retained withdrawals rather than current constants', async () => {
+    const deadline = future(1_500);
+    const policy: FeePolicy = {
+      version: 'contract-price-v1',
+      basisPoints: 500,
+      minimumCents: 1234,
+    };
+    const { procurement: p } = await historicalSelectedProcurement({
+      deadline,
+      deposit: 10_003,
+      feeBasisPoints: 500,
+      feePolicy: policy,
+      tiers: [
+        { minParticipants: 1, priceCents: 90_000 },
+        { minParticipants: 2, priceCents: 70_000 },
+      ],
+    });
+    const first = await commit(runtime.buyers[0], p.id);
+    const second = await commit(runtime.buyers[1], p.id);
+    await capture(runtime.buyers[0], first.id);
+    await capture(runtime.buyers[1], second.id);
+    await runtime.buyers[1].post('/commitments/' + second.id + '/withdraw');
+    await waitUntil(deadline);
+    await finalize();
+    const after = await detail(runtime.admin, p.id);
+    expect(after.contracts[0].finalSnapshot.feePolicy).toEqual(policy);
+    expect(after.contracts[0].finalSnapshot.serviceFeeCents).toBe(3500);
+    expect(after.contracts[0].finalSnapshot.supplierPayoutCents).toBe(6503);
+    const allocated = await ledger(p.id);
+    expect(allocated.PLATFORM_FEE).toEqual({ count: 2, total: 4000 });
+    expect(allocated.SUPPLIER_PAYOUT).toEqual({ count: 2, total: 16_006 });
+  });
+});
+
 describe('transactional commitments and test payments', () => {
   it('prevents duplicate organization acceptances under concurrency', async () => {
     const { procurement: p } = await selectedProcurement(runtime);
@@ -752,8 +1011,18 @@ describe('deadline processing, historical records and administration', () => {
     }
     const financial = await ledger(p.id);
     expect(financial.DEPOSIT).toEqual({ count: 4, total: 40_012 });
-    expect(financial.PLATFORM_FEE).toEqual({ count: 4, total: 1_600 });
-    expect(financial.SUPPLIER_PAYOUT).toEqual({ count: 4, total: 38_412 });
+    expect(financial.PLATFORM_FEE).toEqual({ count: 4, total: 8_800 });
+    expect(financial.SUPPLIER_PAYOUT).toEqual({ count: 4, total: 31_212 });
+    for (const contract of after.contracts) {
+      expect(contract.finalSnapshot.feePolicy).toEqual(CURRENT_FEE_POLICY);
+      expect(contract.finalSnapshot.serviceFeeCents).toBe(2_800);
+      expect(contract.finalSnapshot.supplierPayoutCents).toBe(7_203);
+    }
+    const withdrawnFee = await runtime.pool.query<{ amount_cents: number }>(
+      "SELECT amount_cents FROM ledger WHERE commitment_id=$1 AND kind='PLATFORM_FEE'",
+      [accepted[3].id],
+    );
+    expect(withdrawnFee.rows[0].amount_cents).toBe(400);
     const contracts = await runtime.buyers[0].get<{ contracts: Contract[] }>('/contracts');
     expect(contracts.contracts.some((c) => c.procurementId === p.id)).toBe(true);
     const ownContract = after.contracts.find(
@@ -865,10 +1134,11 @@ describe('deadline processing, historical records and administration', () => {
 
   it('retries failed durable jobs and keeps completion idempotent', async () => {
     const deadline = future(1_500);
-    const { procurement: p } = await selectedProcurement(runtime, {
+    const { procurement: p } = await historicalSelectedProcurement({
       deadline,
       tiers: [{ minParticipants: 1, priceCents: 90_000 }],
       deposit: 13,
+      feeBasisPoints: 400,
     });
     const accepted = await commit(runtime.buyers[0], p.id);
     await capture(runtime.buyers[0], accepted.id);
@@ -1214,7 +1484,7 @@ describe('versioned service forms and demo upgrade', () => {
       {
         organizationId: runtime.supplier.organization.id,
         basePriceCents: 100_000,
-        depositCents: 13,
+        depositCents: 10_003,
         terms: 'Kord kuus: lukustatud söödakastid ja tulemuse kontroll.',
         validUntil: future(),
         tiers: [
@@ -1258,15 +1528,17 @@ describe('versioned service forms and demo upgrade', () => {
     expect(after.contracts).toHaveLength(1);
     expect(after.contracts[0].finalSnapshot.spec).toEqual(spec);
     expect(after.contracts[0].priceCents).toBe(70_000);
-    expect(after.contracts[0].depositCreditCents).toBe(13);
-    expect(after.contracts[0].balanceCents).toBe(69_987);
+    expect(after.contracts[0].depositCreditCents).toBe(10_003);
+    expect(after.contracts[0].balanceCents).toBe(59_997);
+    expect(after.contracts[0].finalSnapshot.serviceFeeCents).toBe(2_800);
+    expect(after.contracts[0].finalSnapshot.supplierPayoutCents).toBe(7_203);
     expect(after.commitments.find((row) => row.id === first.id)?.acceptanceSnapshot).toEqual(
       first.acceptanceSnapshot,
     );
     const allocated = await ledger(p.id);
-    expect(allocated.DEPOSIT).toEqual({ count: 2, total: 26 });
-    expect(allocated.PLATFORM_FEE).toEqual({ count: 2, total: 2 });
-    expect(allocated.SUPPLIER_PAYOUT).toEqual({ count: 2, total: 24 });
+    expect(allocated.DEPOSIT).toEqual({ count: 2, total: 20_006 });
+    expect(allocated.PLATFORM_FEE).toEqual({ count: 2, total: 3_200 });
+    expect(allocated.SUPPLIER_PAYOUT).toEqual({ count: 2, total: 16_806 });
     expect(allocated.REFUND).toBeUndefined();
     await finalize();
     expect(await ledger(p.id)).toEqual(allocated);

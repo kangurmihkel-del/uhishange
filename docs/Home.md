@@ -14,6 +14,8 @@ Owner: project maintainer. This repository implements a local functional pilot f
 - [Development](Development/README.md)
 - [Operations](Operations/README.md)
 - [Full process recording](Demo.md)
+- [Deposit-fee sustainability review](Business/PricingReview.md)
+- [Contract service fee decision](ADR/0005-contract-service-fee.md)
 
 Source authority: accepted implementation plan and user decisions, data design dated 2026-10-10, business analysis dated 2026-10-09, conceptual process image, original poster and supplied standalone Uhishange_vorm.html service catalog. The PSP recommendation supersedes the image's portal-bank-account concept; this pilot only simulates PSP operations.
 

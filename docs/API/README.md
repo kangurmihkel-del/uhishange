@@ -63,4 +63,12 @@ All administration routes require platform-administrator authority. Contacts, ac
 
 This pilot exposes a simulated provider operation, not a production PSP webhook. Captures are unique per commitment payment; event replays cannot double-charge or double-count. Failed attempts can be retried. Late captures produce an equal refund. Ledger entries record deposits, refunds, platform fees, supplier payouts and compensating reversals without editing previous entries. Contracts preserve finalSnapshot separately from acceptanceSnapshot.
 
-Acceptance and final agreement snapshots have explicit shared TypeScript contracts. Their JSON shape is unchanged: acceptance retains acceptedAt and confirmations; final contracts retain finalizedAt, finalPriceCents, depositCreditCents and remainingInvoiceCents. Product history formats stored values in Estonian and Europe/Tallinn without changing or reloading parties from current profiles.
+Acceptance and final agreement snapshots have explicit shared TypeScript contracts. Acceptance retains acceptedAt and confirmations; final contracts retain finalizedAt, finalPriceCents, depositCreditCents and remainingInvoiceCents. Product history formats stored values in Estonian and Europe/Tallinn without changing or reloading parties from current profiles.
+
+## Versioned service fee
+
+Procurement responses expose feePolicy for prospective pricing: current policy for unfrozen groups, the frozen policy for accepted groups. New agreement snapshots add optional feePolicy with version contract-price-v1, basisPoints 400 and minimumCents 1000. Newly created final snapshots additionally preserve serviceFeeCents and supplierPayoutCents. These are additive fields; old snapshots remain unchanged. A missing feePolicy means legacy deposit-v1 using the snapshot's feeBasisPoints and no minimum.
+
+The new fee is supplier-paid 4% of each final gross contract price, minimum EUR 10, deducted from the deposit. It is a final gross fee including VAT if applicable; the buyer's service price and gross deposit credit are unchanged. A pre-finalization post-success withdrawn buyer has no contract and keeps percentage-only deposit allocation. Refunds, idempotency and exact cancellation reversal remain as documented above.
+
+For newly submitted offers, depositCents must cover the largest fee among participant tiers while remaining no greater than the cheapest price. An old unfrozen offer that no longer covers the new fee must be updated before acceptance: POST commitments returns 409 DEPOSIT_FEE_COVERAGE and freezes no terms. Existing frozen legacy agreements do not get this new minimum or fee base. See [ADR 0005](../ADR/0005-contract-service-fee.md).

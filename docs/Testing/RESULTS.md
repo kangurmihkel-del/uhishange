@@ -9,7 +9,7 @@ The functional local pilot is running at http://localhost:3000. All required loc
 | Command                          | Result                                                                                       |
 | -------------------------------- | -------------------------------------------------------------------------------------------- |
 | npm run build                    | Passed: server TypeScript compilation and production Vite assets                             |
-| npm test                         | Passed: 32 integration/API/time/format tests and 12 browser workflows                        |
+| npm test                         | Passed: 39 integration/API/time/format/fee tests and 12 browser workflows                    |
 | npm run analyze                  | Passed: strict TypeScript, ESLint and Prettier checks                                        |
 | npm audit --audit-level=moderate | Passed: zero reported vulnerabilities                                                        |
 | docker compose config --quiet    | Passed                                                                                       |
@@ -24,13 +24,14 @@ The initial sandbox helper could not execute commands. Approved host execution p
 
 Final Vitest V8 coverage from the passing suite:
 
-| Scope                                                    | Statements | Branches | Functions | Lines  |
-| -------------------------------------------------------- | ---------- | -------- | --------- | ------ |
-| Configured server, client API/time and shared form files | 92.46%     | 77.35%   | 92.73%    | 94.10% |
-| Reported server modules                                  | 94.24%     | 81.40%   | 98.49%    | 95.76% |
-| Transactional procurement domain                         | 96.02%     | 87.20%   | 100.00%   | 99.37% |
+| Scope                                                         | Statements | Branches | Functions | Lines   |
+| ------------------------------------------------------------- | ---------- | -------- | --------- | ------- |
+| Configured server, client API/time, shared form and fee files | 92.70%     | 79.07%   | 92.85%    | 94.32%  |
+| Reported server modules                                       | 94.45%     | 83.16%   | 98.50%    | 95.96%  |
+| Transactional procurement domain                              | 96.11%     | 89.36%   | 100.00%   | 99.39%  |
+| Shared fee calculations and frozen-policy fallback            | 100.00%    | 100.00%  | 100.00%   | 100.00% |
 
-The configured coverage now includes the shared service form catalog and validation helpers. Vitest records server/API execution of these helpers; their React rendering and browser defaults are additionally exercised by Playwright. The configured coverage excludes the HTTP/worker entry files; an actual worker subprocess is exercised by the restart scenario. React views are verified by Playwright and are not included in these V8 percentages. Generated reports are in `coverage/` and `playwright-report/`. Coverage is evidence of execution, not a claim that every branch is tested.
+The configured coverage includes the shared service form catalog, validation helpers and versioned fee calculator. Vitest records server/API execution of these helpers; their React rendering and browser defaults are additionally exercised by Playwright. The configured coverage excludes the HTTP/worker entry files; an actual worker subprocess is exercised by the restart scenario. React views are verified by Playwright and are not included in these V8 percentages. Generated reports are in `coverage/` and `playwright-report/`. Coverage is evidence of execution, not a claim that every branch is tested.
 
 All 31 declared HTTP API routes are exercised. The endpoint matrix and scenario details are in [tests/README.md](../../tests/README.md).
 
@@ -140,3 +141,15 @@ Database assertions confirm three completed contracts at 70,000 cents each, 10,0
 The exported H.264 MP4 is 301.526 seconds (5:02), 1440×900 pixels and has 17 chapters. FFprobe assertions and complete-stream decoding passed. A contact sheet and decoded invitation, lower-price, contract, ledger and ending frames were visually inspected. The original WebM, chapter timings and verification JSON accompany the local MP4.
 
 Hosted verification exposed two asynchronous browser checks after the first branch run passed. Public navigation now reveals its focus target immediately, avoiding interrupted smooth-scroll animations during successive activations. Category assertions retry the nonempty, correctly filtered badge condition while a publish-triggered list refresh finishes. These checks retain the viewport, focus, exact route and category assertions; no sleeps or retries of entire failing tests were added.
+
+## Contract service fee acceptance
+
+[ADR 0005](../ADR/0005-contract-service-fee.md) changes new agreements to a supplier-paid 4% fee on the final gross contract value, with a €10 minimum per continuing buyer contract. The canonical build, format and static analysis passed. The full test command passed 39 integration/API/time/format/fee cases and 12 desktop/mobile browser workflows (51 total) against real PostgreSQL/PostGIS.
+
+Integration checks cover a €700 final contract charging €28, the €10 minimum, exact half-up rounding, lower final tiers, full buyer deposit credit, frozen custom policies and legacy deposit-based agreements. Post-success withdrawal before finalization retains the frozen percentage of the deposit without the contract minimum. Tests preserve idempotent allocation, cancellation reversals and refunds. Eight malformed offer variants return HTTP 400 without persisting offers; empty tiers and invalid cent amounts cannot throw uncaught fee-calculation errors. The shared pricing helper has 100% statement, branch, function and line coverage; the current overall configured coverage is recorded above.
+
+Desktop and mobile workflows inspect live supplier previews, the deposit coverage hint, rejected underfunded offers, successful correction and the saved final fee/payout snapshot. A €900 contract with a €100.03 deposit preserves a €36 fee, €64.03 supplier allocation and €799.97 remaining buyer balance. The supplier preview also demonstrates the €10 minimum at a €190 tier. Visually reviewed evidence is available in [desktop preview](screenshots/service-fee-preview-desktop.png), [mobile preview](screenshots/service-fee-preview-mobile.png) and the updated agreement-history captures.
+
+Docker Compose rebuilt the production app/worker with persistent storage preserved. Application/database health and TEST mode are confirmed; the worker runs and initialization exited with code 0. All eighteen production smoke captures passed with zero browser errors or horizontal overflow. Before/after whole-table fingerprints match for the existing four commitments, zero contracts, three ledger rows and 35 audit entries; no existing financial history was rewritten.
+
+The [pricing notebook](../Business/pricing-scenarios.ipynb) executed all six code cells without errors. Its calculation assertions passed and the rendered tables were visually inspected. Cost budgets and participation volumes are explicit scenarios rather than observed operating results. The previously delivered recording remains evidence of the historical deposit-only tariff; the reproducible recorder now expects €84 in fees and €216 in supplier allocations for three €700 contracts with €100 deposits.

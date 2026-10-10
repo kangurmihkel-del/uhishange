@@ -58,6 +58,11 @@ export interface PriceTier {
   minParticipants: number;
   priceCents: number;
 }
+export interface FeePolicy {
+  version: 'contract-price-v1' | 'deposit-v1';
+  basisPoints: number;
+  minimumCents: number;
+}
 export interface AgreementSnapshot {
   procurementId: string;
   title: string;
@@ -75,6 +80,7 @@ export interface AgreementSnapshot {
   tiers: PriceTier[];
   terms: string;
   feeBasisPoints: number;
+  feePolicy?: FeePolicy;
   currency: 'EUR';
   paymentMode: 'TEST';
 }
@@ -93,6 +99,8 @@ export interface FinalContractSnapshot extends AgreementSnapshot {
   finalPriceCents: number;
   depositCreditCents: number;
   remainingInvoiceCents: number;
+  serviceFeeCents?: number;
+  supplierPayoutCents?: number;
   finalizedAt: string;
 }
 export interface Procurement {
@@ -111,6 +119,7 @@ export interface Procurement {
   succeededAt: string | null;
   finalizedAt: string | null;
   frozenAt: string | null;
+  feePolicy: FeePolicy;
   bestPriceCents: number | null;
   activeCount: number;
   createdAt: string;

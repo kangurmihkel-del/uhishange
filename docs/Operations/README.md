@@ -61,6 +61,12 @@ After a code change, run the canonical build, test and analysis commands in the 
 
 Live payments, external email, registry integration and hosting remain deferred. Remaining service balances are invoiced directly by the supplier outside the pilot.
 
+## Service fee upgrade
+
+Newly accepted agreements follow [ADR 0005](../ADR/0005-contract-service-fee.md): supplier-paid 4% of final gross contract price, minimum EUR 10 per association contract. The fee is deducted from the gross deposit; the buyer credits that full deposit against the unchanged service price. The deposit must cover the highest tier fee. Final snapshots record the actual fee and supplier deposit payout. Gross fees include VAT where applicable; no additional buyer charge is introduced.
+
+Rebuild Compose normally without resetting data. Existing frozen agreements without a versioned fee policy remain on their stored deposit-fee rate with no minimum. No snapshots or existing ledger/audit rows are rewritten. Unfrozen old offers with insufficient deposits must be updated before the first commitment; the server rejects acceptance with DEPOSIT_FEE_COVERAGE rather than creating a negative payout. Pre-finalization post-success withdrawal keeps the frozen percentage on its retained deposit with no contract minimum. Failed groups and administrator supplier cancellation keep their full refunds/reversals.
+
 ## Mailbox upgrades
 
 Run the normal Compose rebuild to apply versioned migrations and keep the database volume. Migration 002 creates durable mailbox messages/read receipts and backfills existing invitations. Startup also backfills invitations idempotently for fresh demo data. No reset is required. Mailbox notifications are written transactionally with domain events; failed deadline processing publishes no finalization letter until a successful retry. The UI polls every five seconds and read state survives restart. External email is not sent.
