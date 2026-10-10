@@ -37,6 +37,15 @@ Owner: project maintainer. Base path: /api/v1. JSON requests and responses use c
 
 Snow specification: seasonStart, seasonEnd, areaM2, parkingM2, walkwayM, triggerCm, responseHours, gritting, snowHauling. Price tiers use minParticipants and priceCents; first tier is the success threshold. Dates and validity must cover the joining period. Deposits must not exceed the cheapest possible price. Accepting terms cannot bypass the server-side authority check.
 
+## Mailbox
+
+| Method and path        | Input or result                                                                                            | Authority                                                                                                                             |
+| ---------------------- | ---------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| GET /mailbox           | Visible messages in descending date order and total unreadCount; per-user readAt and live invitation state | Approved membership; viewers see general/invitation messages, representatives also see financial messages; administrators inspect all |
+| POST /mailbox/:id/read | Returns {message}; first read timestamp is retained on replay                                              | Same visibility rule as listing; inaccessible IDs return 404                                                                          |
+
+Messages are append-only organization-addressed snapshots of procurement titles and organization names. Read receipts are append-only and private to each account. Invitations and lifecycle messages are inserted in the same transaction as the underlying operation; retries cannot duplicate an invitation or financial outcome. Opening a letter records its read receipt; accepting an invitation is a separate authorized operation and does not create a commitment. External email is not sent.
+
 ## Administration
 
 | Method and path                     | Input or result                                               |

@@ -28,13 +28,19 @@ export async function logout(page: Page) {
   await page.getByRole('button', { name: 'Logi välja', exact: true }).click();
   await expect(page.getByLabel('E-post', { exact: true })).toBeVisible();
 }
-export async function navigate(page: Page, name: string) {
+export async function navigate(page: Page, name: string | RegExp) {
   const menu = page.getByRole('button', { name: 'Ava menüü', exact: true });
   if (await menu.isVisible()) await menu.click();
   await page
     .getByRole('navigation', { name: 'Põhinavigatsioon' })
     .getByRole('link', { name, exact: true })
     .click();
+}
+export async function nextAction(page: Page, name: string) {
+  await expect(page.getByTestId('procurement-flow')).toBeVisible();
+  const action = page.getByTestId('next-action');
+  await expect(action).toBeVisible();
+  await action.getByRole('button', { name, exact: true }).click();
 }
 export async function expectResponsive(page: Page) {
   const dimensions = await page.evaluate(() => ({
@@ -65,7 +71,7 @@ export async function finalizedFixture(request: APIRequestContext) {
       membership.role === 'representative' &&
       membership.organization.orgType === 'BUYER',
   )!.organizationId;
-  const deadline = new Date(Date.now() + 2_000).toISOString();
+  const deadline = new Date(Date.now() + 4_000).toISOString();
   const year = new Date().getUTCFullYear() + 1;
   const { procurement } = await api<{ procurement: Procurement }>(request, '/procurements', {
     organizationId: buyerId,

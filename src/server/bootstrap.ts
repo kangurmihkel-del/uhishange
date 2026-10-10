@@ -1,6 +1,7 @@
 import { pathToFileURL } from 'node:url';
 import { migrate, pool, transaction } from './db.js';
 import { hashPassword } from './auth.js';
+import { backfillInvitationMessages } from './mailbox.js';
 
 export async function bootstrap(options: { seed?: boolean } = { seed: true }): Promise<void> {
   await migrate();
@@ -120,6 +121,7 @@ export async function bootstrap(options: { seed?: boolean } = { seed: true }): P
       [procurementId],
     );
   });
+  await transaction((client) => backfillInvitationMessages(client));
 }
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
   await bootstrap({ seed: process.env.SEED_DEMO !== 'false' });

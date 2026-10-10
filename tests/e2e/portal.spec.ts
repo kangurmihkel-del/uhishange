@@ -7,12 +7,14 @@ import {
   login,
   logout,
   navigate,
+  nextAction,
   registrationPassword,
   uniqueTitle,
 } from './helpers.js';
 import type {
   AdminResponse,
   Invitation,
+  MailboxResponse,
   ProcurementDetail,
   SessionResponse,
 } from '../../src/shared/types.js';
@@ -38,7 +40,7 @@ test('buyer, supplier and neighboring buyers reach a lower tier through the port
   await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
   const id = page.url().split('#procurement/')[1];
   expect(id).toBeTruthy();
-  await page.getByRole('button', { name: 'Avalda hange', exact: true }).click();
+  await nextAction(page, 'Avalda hange');
   await expect(page.getByText('Liitumine avatud', { exact: true })).toBeVisible();
   const created = await api<ProcurementDetail>(page.request, '/procurements/' + id);
   await api(page.request, '/organizations', {
@@ -51,7 +53,7 @@ test('buyer, supplier and neighboring buyers reach a lower tier through the port
   });
   await page.reload();
   await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
-  await page.getByRole('button', { name: /^Naabrid ja kutsed/ }).click();
+  await nextAction(page, 'Kutsu naabrid');
   const map = page.getByRole('img', { name: /Hanke keskpunkt ja läheduses olevad ühistud/ });
   await expect(map).toBeVisible();
   await page.getByRole('button', { name: 'Suurenda kaarti', exact: true }).click();
@@ -69,8 +71,8 @@ test('buyer, supplier and neighboring buyers reach a lower tier through the port
   await logout(page);
   await login(page, 'supplier@demo.test');
   await page.goto('/#procurement/' + id);
-  await page.getByRole('button', { name: /^Pakkumised/ }).click();
-  await page.getByRole('button', { name: 'Esita pakkumine', exact: true }).click();
+  await nextAction(page, 'Esita pakkumine');
+  await expect(page.getByLabel('Hooaja tavahind (€)', { exact: true })).toBeVisible();
   await page.getByLabel('Hooaja tavahind (€)', { exact: true }).fill('1000');
   await page.getByLabel('Tagatisraha (€)', { exact: true }).fill('100.03');
   await page.getByLabel(/^Osalejate arv(?! 2)/).fill('2');
@@ -87,15 +89,50 @@ test('buyer, supplier and neighboring buyers reach a lower tier through the port
   await logout(page);
   await login(page);
   await page.goto('/#procurement/' + id);
-  await page.getByRole('button', { name: /^Pakkumised/ }).click();
+  await nextAction(page, 'Võrdle ja vali pakkumine');
   await page.getByRole('button', { name: 'Vali pakkumine', exact: true }).click();
   await expect(page.getByText('Valitud pakkumine', { exact: true })).toBeVisible();
   for (let index = 1; index <= 3; index++) {
     if (index > 1) {
       await logout(page);
-      await login(page, 'buyer' + index + '@demo.test');
-      await page.goto('/#procurement/' + id);
+      if (index === 2) {
+        await page.getByRole('button', { name: 'Naaberühistu', exact: true }).click();
+        await expect(page.getByRole('button', { name: 'Logi välja', exact: true })).toBeVisible();
+        expect((await api<SessionResponse>(page.request, '/session')).user?.email).toBe(
+          'buyer2@demo.test',
+        );
+        await navigate(page, /^Postkast/);
+        const inbox = await api<MailboxResponse>(page.request, '/mailbox');
+        const invitation = inbox.messages.find(
+          (message) => message.procurementId === id && message.kind === 'INVITATION',
+        )!;
+        expect(invitation).toBeDefined();
+        expect(invitation.readAt).toBeNull();
+        const letter = page.getByTestId('mailbox-message').filter({ hasText: invitation.subject });
+        await letter.getByRole('button', { name: 'Ava kiri', exact: true }).click();
+        const detail = page.getByTestId('mailbox-detail');
+        await expect(detail).toContainText(invitation.subject);
+        await expect(detail).toBeInViewport();
+        await expect(detail).toContainText('Kutse vastuvõtmine on eraldi liitumisest');
+        await expect
+          .poll(
+            async () =>
+              (await api<MailboxResponse>(page.request, '/mailbox')).messages.find(
+                (message) => message.id === invitation.id,
+              )?.readAt,
+          )
+          .not.toBeNull();
+        await detail.getByRole('button', { name: 'Võta kutse vastu', exact: true }).click();
+        await expect(detail).toContainText(/vastu võetud/i);
+        const afterAccept = await api<ProcurementDetail>(page.request, '/procurements/' + id);
+        expect(afterAccept.commitments).toHaveLength(0);
+        await detail.getByRole('link', { name: 'Vaata hanget', exact: true }).click();
+      } else {
+        await login(page, 'buyer' + index + '@demo.test');
+        await page.goto('/#procurement/' + id);
+      }
     }
+    await nextAction(page, 'Kinnita liitumine');
     const join = page.getByRole('button', { name: 'Liitu hankega', exact: true });
     await expect(join).toBeDisabled();
     await page
@@ -137,6 +174,7 @@ test('buyer, supplier and neighboring buyers reach a lower tier through the port
     await expect(
       page.getByText('TESTMAKSE · Tegelikku raha ei liigu', { exact: true }).first(),
     ).toBeVisible();
+    await nextAction(page, 'Tee testmakse');
     await page.getByRole('button', { name: 'Kinnita testmakse', exact: true }).click();
     await expect(page.getByText(index + ' makstud liitumist', { exact: true })).toBeVisible();
   }
@@ -256,7 +294,40 @@ test('individual contracts expose final prices, accept ratings and retain cancel
 }) => {
   const fixture = await finalizedFixture(request);
   await login(page);
-  await navigate(page, 'Lepingud');
+  await navigate(page, /^Postkast/);
+  const inbox = await api<MailboxResponse>(page.request, '/mailbox');
+  const finalMessage = inbox.messages.find(
+    (message) =>
+      message.procurementId === fixture.procurement.id && message.kind === 'PROCUREMENT_FINALIZED',
+  )!;
+  expect(finalMessage).toBeDefined();
+  const finalLetter = page.getByTestId('mailbox-message').filter({ hasText: finalMessage.subject });
+  await finalLetter.getByRole('button', { name: 'Märgi loetuks', exact: true }).click();
+  await expect(finalLetter.getByRole('button', { name: 'Märgi loetuks', exact: true })).toHaveCount(
+    0,
+  );
+  const readAt = (await api<MailboxResponse>(page.request, '/mailbox')).messages.find(
+    (message) => message.id === finalMessage.id,
+  )?.readAt;
+  expect(readAt).not.toBeNull();
+  await logout(page);
+  await login(page);
+  await navigate(page, /^Postkast/);
+  expect(
+    (await api<MailboxResponse>(page.request, '/mailbox')).messages.find(
+      (message) => message.id === finalMessage.id,
+    )?.readAt,
+  ).toBe(readAt);
+  await finalLetter.getByRole('button', { name: 'Ava kiri', exact: true }).click();
+  await expect(page.getByTestId('mailbox-detail')).toContainText('TEST');
+  await page
+    .getByTestId('mailbox-detail')
+    .getByRole('link', { name: 'Vaata hanget', exact: true })
+    .click();
+  await expect(
+    page.getByTestId('next-action').getByRole('button', { name: 'Kinnita liitumine', exact: true }),
+  ).toHaveCount(0);
+  await nextAction(page, 'Vaata lepinguid');
   const contract = page.getByTestId('contract-card').filter({ hasText: fixture.procurement.title });
   await expect(contract).toBeVisible();
   await expect(contract).toContainText(/900\s*€/);
@@ -373,7 +444,10 @@ test('a continuing buyer can withdraw from an active final contract', async ({ p
   await expectResponsive(page);
 });
 
-test('approved viewers read invitations without response authority', async ({ page, request }) => {
+test('approved viewers read mailbox invitations without response authority', async ({
+  page,
+  request,
+}) => {
   const target = await api<SessionResponse>(request, '/login', {
     email: 'buyer8@demo.test',
     password: 'Demo2026!',
@@ -395,14 +469,23 @@ test('approved viewers read invitations without response authority', async ({ pa
   )!;
   await api(request, '/admin/memberships/' + membership.id, { status: 'approved' });
   await login(page, email, registrationPassword);
-  await navigate(page, 'Kutsed');
+  await navigate(page, /^Postkast/);
   const invitations = await api<{ invitations: Invitation[] }>(page.request, '/invitations');
   const pending = invitations.invitations.find((item) => item.status === 'PENDING');
   expect(pending).toBeDefined();
-  const card = page.getByTestId('invitation-card').filter({ hasText: pending!.procurementTitle });
-  await expect(card).toContainText(
-    'Sul on vaatamisõigus. Kutsele saab vastata kinnitatud esindaja.',
+  const inbox = await api<MailboxResponse>(page.request, '/mailbox');
+  expect(inbox.messages.every((message) => message.audience === 'MEMBERS')).toBe(true);
+  const invitationMessage = inbox.messages.find(
+    (message) => message.invitation?.id === pending!.id,
+  )!;
+  expect(invitationMessage).toBeDefined();
+  const letter = page.getByTestId('mailbox-message').filter({ hasText: invitationMessage.subject });
+  await letter.getByRole('button', { name: 'Ava kiri', exact: true }).click();
+  const detail = page.getByTestId('mailbox-detail');
+  await expect(detail).toContainText(
+    'Vaatleja saab kirja lugeda. Kutsele vastamiseks on vajalik kinnitatud esindusõigus.',
   );
+  await expect(detail).toBeInViewport();
   await expect(page.getByRole('button', { name: 'Võta kutse vastu', exact: true })).toHaveCount(0);
   await expect(page.getByRole('button', { name: 'Lükka tagasi', exact: true })).toHaveCount(0);
   const rejected = await page.request.post('/api/v1/invitations/' + pending!.id + '/respond', {
@@ -412,10 +495,13 @@ test('approved viewers read invitations without response authority', async ({ pa
   expect(rejected.status()).toBe(403);
   const unchanged = await api<{ invitations: Invitation[] }>(page.request, '/invitations');
   expect(unchanged.invitations.find((item) => item.id === pending!.id)?.status).toBe('PENDING');
-  await card.getByRole('link', { name: 'Vaata hanget', exact: true }).click();
+  await detail.getByRole('link', { name: 'Vaata hanget', exact: true }).click();
   await expect(
     page.getByRole('heading', { name: pending!.procurementTitle, exact: true }),
   ).toBeVisible();
   await expect(page.getByRole('button', { name: 'Liitu hankega', exact: true })).toHaveCount(0);
+  await expect(
+    page.getByTestId('next-action').getByRole('button', { name: 'Kinnita liitumine', exact: true }),
+  ).toHaveCount(0);
   await expectResponsive(page);
 });

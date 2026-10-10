@@ -60,3 +60,7 @@ After a code change, run the canonical build, test and analysis commands in the 
 `node scripts/verify-preview.mjs` performs read-only desktop/mobile production smoke checks through fictional demo logins and writes screenshots to `docs/Testing/screenshots`. It checks page overflow and browser errors. It expects the seeded demo procurement in the main database and does not create commitments or financial transactions.
 
 Live payments, external email, registry integration and hosting remain deferred. Remaining service balances are invoiced directly by the supplier outside the pilot.
+
+## Mailbox upgrades
+
+Run the normal Compose rebuild to apply versioned migrations and keep the database volume. Migration 002 creates durable mailbox messages/read receipts and backfills existing invitations. Startup also backfills invitations idempotently for fresh demo data. No reset is required. Mailbox notifications are written transactionally with domain events; failed deadline processing publishes no finalization letter until a successful retry. The UI polls every five seconds and read state survives restart. External email is not sent.

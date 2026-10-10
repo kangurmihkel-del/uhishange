@@ -33,12 +33,15 @@ Demo organizations, coordinates, contracts and money are test material. Local re
 
 ## Try the complete workflow
 
-1. Sign in as buyer1, create a seasonal procurement, publish it and generate nearby in-app invitations.
-2. Sign in as the supplier and publish an offer with participant/price tiers and a fixed deposit.
-3. As the initiator, select one offer. Each buyer confirms authority and scope, then captures their test deposit.
-4. Reach the first tier to confirm success. Additional paid buyers can improve everyone's price until the joining deadline.
-5. At the deadline, the worker finalizes individual contracts and distributes deposits: 4% platform fee and 96% supplier share. Buyers confirm completion and leave ratings.
-6. Inspect immutable events, ledger entries, imports and approvals as administrator.
+1. Use **Ostja** (buyer1) to create a seasonal procurement. Follow the visible **next action**: publish, open the neighbor map and send in-app invitations.
+2. Use **Naaberühistu** (buyer2), open **Postkast**, read the invitation and accept it. Follow **Vaata hanget** to see the shared process. Invitation acceptance is separate from paid participation.
+3. Sign in as the supplier and publish an offer with participant/price tiers and a fixed deposit.
+4. As the initiator, select one offer. Each buyer confirms authority and scope, then captures their test deposit.
+5. Reach the first tier to confirm success. Additional paid buyers can improve everyone's price until the joining deadline.
+6. At the deadline, the worker finalizes individual contracts and distributes deposits: 4% platform fee and 96% supplier share. Buyers confirm completion and leave ratings.
+7. Inspect immutable events, ledger entries, imports and approvals as administrator.
+
+The procurement page shows the five stages and a role-specific next action above its details. Buttons open the actual offer, neighbor or joining form. The mailbox stores invitations and offer/payment/deadline notifications; each user's read status survives logout and restart. All financial letters explicitly identify TEST transactions.
 
 Acceptance details and final contracts show the saved agreement in Estonian, including historical organization profiles, service scope, tiers, prices and Tallinn dates. Profile changes and cancellation preserve this history. Approved viewers can read invitations; only representatives or administrators can respond. CSV preview gives field-specific corrections in Estonian before any import is applied.
 

@@ -15,3 +15,5 @@ Workflow action versions were checked against official release pages: [checkout]
 Follow-up acceptance coverage verifies readable frozen agreement history on desktop and mobile, separate final pricing after lower tiers and cancellation, and localized field-specific CSV errors through the real HTTP preview endpoint.
 
 Invitation browser coverage includes an approved viewer: invitations remain readable, response controls are absent, and the API rejects a forged response.
+
+Mailbox coverage uses real PostgreSQL/HTTP to verify seed and newly sent invitation messages, organization isolation, viewer restrictions, per-user read persistence and idempotence, offer/lifecycle notifications, and no duplicates from repeated sends or payment replay. Browser scenarios follow the visible next-action controls, open the neighbor demo mailbox, respond to an invitation, join/pay, and reach contract review without hunting for tabs on desktop/mobile.
