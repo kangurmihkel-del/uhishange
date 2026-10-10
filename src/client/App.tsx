@@ -11,7 +11,6 @@ import {
   type ReactNode,
 } from 'react';
 import {
-  ArrowDownLeft,
   ArrowRight,
   Bell,
   Building2,
@@ -28,7 +27,6 @@ import {
   FileCheck2,
   FileText,
   Home,
-  Layers3,
   Mail,
   LogOut,
   MapPin,
@@ -73,8 +71,29 @@ import ServiceScope from './ServiceScope';
 import AgreementHistory from './AgreementHistory';
 import Mailbox from './Mailbox';
 import ProcurementFlow, { type FlowTarget } from './ProcurementFlow';
+import Brand, { BrandMark, CommunityHouses } from './Brand';
+import ParticipantProgress from './ParticipantProgress';
 
 const serviceId = (spec: ProcurementSpec) => ('formId' in spec ? spec.formId : 'snow');
+const communitySteps = [
+  ['Avalda hange', 'Kirjelda oma ühistule vajalik teenus ja vali liitumise tähtaeg.'],
+  [
+    'Kutsu naabrid ja vali pakkumine',
+    'Leia kaardilt lähinaabrid. Võrdle pakkumisi ja vali üks teenusepakkuja enne liitumisi.',
+  ],
+  [
+    'Liitu ja tee testmakse',
+    'Kinnita ühine tööde ulatus ja maksa TEST tagatis. Osalejaks loeb kinnitatud makse.',
+  ],
+  [
+    'Oota liitumise tähtaega',
+    'Vajaliku arvu täitumisel hange õnnestub. Tähtajani saavad naabrid liituda ja hind langeda.',
+  ],
+  [
+    'Leping ja teenuse lõpetamine',
+    'Tähtajal tekib jätkava ühistu leping. Pärast teenust anna hinnang; ülejäänud tasu arveldatakse otse pakkujaga.',
+  ],
+];
 
 type Notice = { kind: 'success' | 'error'; text: string } | null;
 type Operations = {
@@ -370,7 +389,7 @@ export default function App() {
   const detailId = route.startsWith('procurement/') ? route.split('/')[1] : null;
   const nav = [
     { id: 'overview', label: 'Ülevaade', icon: Home },
-    { id: 'procurements', label: 'Hanked', icon: Layers3 },
+    { id: 'procurements', label: 'Hanked', icon: ClipboardList },
     { id: 'mailbox', label: 'Postkast', icon: Mail },
     { id: 'invitations', label: 'Kutsed', icon: Bell },
     { id: 'contracts', label: 'Lepingud', icon: FileCheck2 },
@@ -398,7 +417,9 @@ export default function App() {
     <OperationsContext.Provider value={{ busy, run }}>
       {!session ? (
         <div className="initial-loading">
-          <Snowflake size={38} />
+          <span className="brand-mark">
+            <BrandMark />
+          </span>
           <LoadState loading={!sessionError} error={sessionError}>
             {null}
           </LoadState>
@@ -418,15 +439,7 @@ export default function App() {
             />
           )}
           <aside className={`sidebar ${mobileMenu ? 'sidebar-open' : ''}`}>
-            <a href="#overview" className="brand">
-              <span className="brand-mark">
-                <Layers3 size={25} />
-              </span>
-              <span>
-                ühi<span className="brand-thin">shange</span>
-                <small>KOOS ON SOODSAM</small>
-              </span>
-            </a>
+            <Brand tagline />
             <div className="sidebar-divider" />
             <span className="sidebar-caption">TÖÖLAUD</span>
             <nav aria-label="Põhinavigatsioon">
@@ -457,9 +470,9 @@ export default function App() {
             </nav>
             <div className="sidebar-guide">
               <div className="guide-icon">
-                <Snowflake size={24} />
+                <Building2 size={24} />
               </div>
-              <strong>Naabritega koos, soodsamalt.</strong>
+              <strong>Koos tellides tuleb parem hind.</strong>
               <p>Ühine oma naabritega ja telli ühistule vajalik teenus soodsama hinnaga.</p>
               <a href="#procurements">
                 Vaata hankeid <ArrowRight size={15} />
@@ -659,155 +672,219 @@ function Auth({ onLogin }: { onLogin: () => Promise<void> }) {
       await api('/login', { email: address, password: 'Demo2026!' });
       await onLogin();
     });
+  const showInfo = (event: React.MouseEvent<HTMLAnchorElement>, sectionId: string) => {
+    event.preventDefault();
+    const section = document.getElementById(sectionId);
+    section?.focus({ preventScroll: true });
+    section?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  };
+  const startProcurement = () => {
+    setRegister(true);
+    requestAnimationFrame(() => {
+      const input = document.querySelector<HTMLInputElement>(
+        '#account-form input[autocomplete="name"]',
+      );
+      input?.focus({ preventScroll: true });
+      input?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    });
+  };
   return (
     <div className="auth-page">
-      <div className="auth-story">
-        <a className="brand" href="#overview">
-          <span className="brand-mark">
-            <Layers3 size={28} />
-          </span>
-          <span>
-            ühi<span className="brand-thin">shange</span>
-            <small>KOOS ON SOODSAM</small>
-          </span>
-        </a>
-        <div className="auth-story-main">
-          <span className="auth-eyebrow">
-            <span /> MUSTAMÄE KORTERIÜHISTUTELE
-          </span>
-          <h1>
-            Hea naaber.
-            <br />
-            Veel parem
-            <br />
-            <span>ühine hind.</span>
-          </h1>
-          <p>
-            Ühendame naaberühistud, et ühiste teenuste tellimine oleks lihtsam, läbipaistvam ja
-            soodsam.
-          </p>
-          <div className="auth-benefits">
-            <div>
-              <Users size={21} />
-              <span>Naabrid ühes hankes</span>
-            </div>
-            <div>
-              <Euro size={21} />
-              <span>Rohkem liitujaid, soodsam hind</span>
-            </div>
-            <div>
-              <ShieldCheck size={21} />
-              <span>Kinnitatud esindusõigus</span>
-            </div>
-          </div>
-        </div>
-        <div className="auth-landscape" aria-hidden="true">
-          <Snowflake className="auth-snow snow-one" size={38} />
-          <Snowflake className="auth-snow snow-two" size={25} />
-          <div className="building building-one">
-            {Array.from({ length: 12 }, (_, index) => (
-              <i key={index} />
-            ))}
-          </div>
-          <div className="building building-two">
-            {Array.from({ length: 16 }, (_, index) => (
-              <i key={index} />
-            ))}
-          </div>
-          <div className="building building-three">
-            {Array.from({ length: 9 }, (_, index) => (
-              <i key={index} />
-            ))}
-          </div>
-          <div className="snow-ground" />
-        </div>
-        <small className="auth-caption">
-          Kohalik piloot · Kõik organisatsioonid ja maksed on demokeskkonnas.
-        </small>
-      </div>
-      <div className="auth-form-side">
-        <div className="auth-card">
-          <span className="eyebrow">TERE TULEMAST</span>
-          <h2>{register ? 'Loo oma konto' : 'Hea koostöö algab siit.'}</h2>
-          <p className="muted">
-            {register
-              ? 'Pärast registreerimist saad taotleda oma organisatsiooni esindusõigust.'
-              : 'Logi sisse ja vaata, mida saad koos naabritega võita.'}
-          </p>
-          <form onSubmit={submit}>
-            {register && (
-              <Field label="Nimi">
-                <input
-                  autoComplete="name"
-                  value={name}
-                  onChange={(event) => setName(event.target.value)}
-                  minLength={2}
-                  required
-                />
-              </Field>
-            )}
-            <Field label="E-post">
-              <input
-                type="email"
-                autoComplete="email"
-                placeholder="nimi@uhistu.ee"
-                value={email}
-                onChange={(event) => setEmail(event.target.value)}
-                required
-              />
-            </Field>
-            <Field label="Parool" hint={register ? 'Vähemalt 10 märki.' : undefined}>
-              <input
-                type="password"
-                autoComplete={register ? 'new-password' : 'current-password'}
-                minLength={register ? 10 : undefined}
-                value={password}
-                onChange={(event) => setPassword(event.target.value)}
-                required
-              />
-            </Field>
-            <Button className="full-width">
-              {register ? 'Loo konto' : 'Logi sisse'}
-              <ArrowRight size={18} />
-            </Button>
-          </form>
-          <p className="auth-toggle">
-            {register ? 'Konto on juba olemas?' : 'Esimest korda siin?'}{' '}
-            <button onClick={() => setRegister(!register)}>
-              {register ? 'Logi sisse' : 'Loo konto'}
-            </button>
-          </p>
-          <div className="demo-login">
-            <span>PROOVI DEMOKONTOT</span>
-            <div>
-              <Button variant="secondary" onClick={() => demo('buyer1@demo.test')}>
-                <Building2 size={16} />
-                Ostja
+      <header className="public-header">
+        <Brand />
+        <nav className="public-nav" aria-label="Avalik navigatsioon">
+          <a href="#services" onClick={(event) => showInfo(event, 'services')}>
+            Teenused
+          </a>
+          <a href="#how-it-works" onClick={(event) => showInfo(event, 'how-it-works')}>
+            Kuidas toimib
+          </a>
+          <a href="#for-suppliers" onClick={(event) => showInfo(event, 'for-suppliers')}>
+            Teenusepakkujale
+          </a>
+        </nav>
+        <Button
+          type="button"
+          className="public-start"
+          data-testid="public-start"
+          onClick={startProcurement}
+        >
+          Alusta ühishanget <ArrowRight size={17} />
+        </Button>
+      </header>
+      <main>
+        <div className="auth-body">
+          <div className="auth-story">
+            <div className="auth-story-main">
+              <span className="auth-eyebrow">
+                <span /> MUSTAMÄE · KOOS NAABRITEGA
+              </span>
+              <h1>Koos tellides tuleb parem hind.</h1>
+              <p>
+                Ühenda oma ühistu vajadus läheduses olevate naabritega ja küsi teenusepakkujatelt
+                ühine pakkumine.
+              </p>
+              <Button type="button" className="auth-start" onClick={startProcurement}>
+                Alusta ühishanget <ArrowRight size={18} />
               </Button>
-              <Button variant="secondary" onClick={() => demo('buyer2@demo.test')}>
-                <Building2 size={16} />
-                Naaberühistu
-              </Button>
-              <Button variant="secondary" onClick={() => demo('supplier@demo.test')}>
-                <Snowflake size={16} />
-                Pakkuja
-              </Button>
-              <Button variant="secondary" onClick={() => demo('admin@demo.test')}>
-                <ShieldCheck size={16} />
-                Administraator
-              </Button>
+              <div className="auth-benefits">
+                <div>
+                  <Users size={21} />
+                  <span>Naabrid ühes hankes</span>
+                </div>
+                <div>
+                  <Euro size={21} />
+                  <span>Rohkem liitujaid, soodsam hind</span>
+                </div>
+                <div>
+                  <ShieldCheck size={21} />
+                  <span>Kinnitatud esindusõigus</span>
+                </div>
+              </div>
             </div>
-            <small>
-              Demoparool: <code>Demo2026!</code> · Naaberühistu: buyer2@demo.test. Alusta ostjana,
-              saada kutse ja ava see naaberühistu postkastis.
+            <div className="auth-community">
+              <CommunityHouses />
+              <p>Üks vajadus. Mitu tellijat. Parem pakkumine.</p>
+            </div>
+            <small className="auth-caption">
+              Kohalik piloot · Fiktiivsed demokontod ja TEST maksed.
             </small>
           </div>
-          <div className="auth-test">
-            <ShieldCheck size={17} />
-            <span>TESTKESKKOND · Päris raha ei liigu</span>
+          <div className="auth-form-side">
+            <div className="auth-card" id="account-form">
+              <span className="eyebrow">TERE TULEMAST</span>
+              <h2>{register ? 'Loo oma konto' : 'Hea koostöö algab siit.'}</h2>
+              <p className="muted">
+                {register
+                  ? 'Pärast registreerimist saad taotleda oma organisatsiooni esindusõigust.'
+                  : 'Logi sisse ja vaata, mida saad koos naabritega võita.'}
+              </p>
+              <form onSubmit={submit}>
+                {register && (
+                  <Field label="Nimi">
+                    <input
+                      autoComplete="name"
+                      value={name}
+                      onChange={(event) => setName(event.target.value)}
+                      minLength={2}
+                      required
+                    />
+                  </Field>
+                )}
+                <Field label="E-post">
+                  <input
+                    type="email"
+                    autoComplete="email"
+                    placeholder="nimi@uhistu.ee"
+                    value={email}
+                    onChange={(event) => setEmail(event.target.value)}
+                    required
+                  />
+                </Field>
+                <Field label="Parool" hint={register ? 'Vähemalt 10 märki.' : undefined}>
+                  <input
+                    type="password"
+                    autoComplete={register ? 'new-password' : 'current-password'}
+                    minLength={register ? 10 : undefined}
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    required
+                  />
+                </Field>
+                <Button className="full-width">
+                  {register ? 'Loo konto' : 'Logi sisse'}
+                  <ArrowRight size={18} />
+                </Button>
+              </form>
+              <p className="auth-toggle">
+                {register ? 'Konto on juba olemas?' : 'Esimest korda siin?'}{' '}
+                <button onClick={() => setRegister(!register)}>
+                  {register ? 'Logi sisse' : 'Loo konto'}
+                </button>
+              </p>
+              <div className="demo-login">
+                <span>PROOVI DEMOKONTOT</span>
+                <div>
+                  <Button variant="secondary" onClick={() => demo('buyer1@demo.test')}>
+                    <Building2 size={16} />
+                    Ostja
+                  </Button>
+                  <Button variant="secondary" onClick={() => demo('buyer2@demo.test')}>
+                    <Building2 size={16} />
+                    Naaberühistu
+                  </Button>
+                  <Button variant="secondary" onClick={() => demo('supplier@demo.test')}>
+                    <Building2 size={16} />
+                    Pakkuja
+                  </Button>
+                  <Button variant="secondary" onClick={() => demo('admin@demo.test')}>
+                    <ShieldCheck size={16} />
+                    Administraator
+                  </Button>
+                </div>
+                <small>
+                  Demoparool: <code>Demo2026!</code> · Naaberühistu: buyer2@demo.test. Alusta
+                  ostjana, saada kutse ja ava see naaberühistu postkastis.
+                </small>
+              </div>
+              <div className="auth-test">
+                <ShieldCheck size={17} />
+                <span>TESTKESKKOND · Päris raha ei liigu</span>
+              </div>
+            </div>
           </div>
         </div>
-      </div>
+        <div className="public-info-grid">
+          <section className="public-info-card" id="services" tabIndex={-1}>
+            <span className="eyebrow">ÜKS VAJADUS. MITU TELLIJAT.</span>
+            <h2>Koos tellitavad teenused</h2>
+            <p>Vali ühistule vajalik töö. Sama teenuse ühine tellimus aitab naabrid kokku tuua.</p>
+            <ul className="public-services">
+              {SERVICE_FORMS.map((form) => (
+                <li key={form.id}>
+                  <Check size={17} aria-hidden="true" />
+                  <span>{form.label}</span>
+                </li>
+              ))}
+            </ul>
+          </section>
+          <section className="public-info-card" id="how-it-works" tabIndex={-1}>
+            <span className="eyebrow">TEEME KOOS.</span>
+            <h2>Viis sammu ühise tellimuseni</h2>
+            <ol className="public-steps">
+              {communitySteps.map(([title, description]) => (
+                <li key={title}>
+                  <strong>{title}</strong>
+                  <p>{description}</p>
+                </li>
+              ))}
+            </ol>
+            <p>
+              Kui vajalik arv tähtajaks ei täitu, tagastatakse makstud TEST tagatised täies
+              ulatuses.
+            </p>
+          </section>
+          <section className="public-info-card" id="for-suppliers" tabIndex={-1}>
+            <span className="eyebrow">TEENUSEPAKKUJALE</span>
+            <h2>Parem pakkumine mitmele ühistule</h2>
+            <p>
+              Paku läheduses olevatele ühistutele kogu kirjeldatud teenuse brutohind. Määra
+              osalejate hinnatasemed: rohkem tellijaid saab tähendada soodsamat hinda.
+            </p>
+            <p>
+              Algataja valib ühe pakkumise enne liitumisi. Esimene hinnatase määrab vajaliku
+              osalejate arvu ja TEST tagatis ei tohi ületada soodsaimat hinda.
+            </p>
+            <p>
+              Ülejäänud teenusetasu arveldatakse otse pakkujaga. Demokeskkonnas tegelikku raha ei
+              liigu.
+            </p>
+            <Button type="button" variant="secondary" onClick={() => demo('supplier@demo.test')}>
+              Proovi pakkuja demot <ArrowRight size={17} />
+            </Button>
+          </section>
+        </div>
+      </main>
     </div>
   );
 }
@@ -855,18 +932,12 @@ function Overview({
       <div className="dashboard-hero">
         <div className="hero-copy">
           <span className="hero-badge">
-            <Snowflake size={14} />
+            <MapPin size={14} />
             ÜHISHANKED · MUSTAMÄE
           </span>
-          <h2>
-            Koos on lihtsam.
-            <br />
-            <span>Valmistume koos.</span>
-          </h2>
+          <h2>Koos tellides tuleb parem hind.</h2>
           <p>
-            Koonda naaberühistud ühte hankesse.
-            <br />
-            Mida rohkem meid on, seda parem on hind.
+            Leia naabrid, kellel on sama vajadus. Tehke üks tellimus koos ja valige sobiv pakkumine.
           </p>
           <a href="#procurements" className="button hero-button">
             Leia sobiv ühishange
@@ -876,44 +947,30 @@ function Overview({
             <ShieldCheck size={15} /> Läbipaistvad hinnad. Ühine teenusepakkuja.
           </div>
         </div>
-        <div className="hero-visual" aria-hidden="true">
-          <div className="hero-orbit orbit-one" />
-          <div className="hero-orbit orbit-two" />
-          <div className="hero-building-group">
-            <div className="hero-small-building">
-              <Building2 size={38} />
-              <span>NAABERÜHISTU</span>
-            </div>
-            <div className="hero-main-building">
-              <div className="hero-building-icon">
-                <Building2 size={60} />
-              </div>
-              <strong>Sinu ühistu</strong>
-              <span>
-                <Check size={13} /> Üheskoos soodsam
-              </span>
-            </div>
-            <div className="hero-small-building second">
-              <Building2 size={36} />
-              <span>NAABERÜHISTU</span>
-            </div>
-          </div>
-          <div className="hero-floating">
+        <div className="hero-community">
+          <CommunityHouses />
+          <div className="community-summary">
             <div>
-              <Users size={18} />
+              <strong>{loading ? '…' : error ? '—' : open.length}</strong>
+              <span>avatud ühishanget</span>
             </div>
-            <span>
-              Ühine jõud<strong>Parem ühine hind</strong>
-            </span>
-            <ArrowDownLeft size={24} />
+            <div>
+              <strong>
+                {loading
+                  ? '…'
+                  : error
+                    ? '—'
+                    : rows.reduce((sum, item) => sum + item.activeCount, 0)}
+              </strong>
+              <span>makstud liitumist</span>
+            </div>
           </div>
-          <Snowflake className="hero-flake one" size={24} />
-          <Snowflake className="hero-flake two" size={35} />
+          <p className="community-note">Naabrid kokku. Ühine tellimus.</p>
         </div>
       </div>
       <div className="kpi-grid">
         <Metric
-          icon={<Layers3 size={22} />}
+          icon={<ClipboardList size={22} />}
           value={loading ? '…' : String(open.length)}
           label="Avatud ühishanget"
           note="Leia oma ühistule sobiv"
@@ -968,30 +1025,18 @@ function Overview({
             <div className="small-icon">
               <Users size={20} />
             </div>
-            <h3>Koos on lihtsam.</h3>
-            <p>Hea ühishange algab kolmest sammust.</p>
+            <h3>Teeme koos.</h3>
+            <p>Viis sammu ühise tellimuseni.</p>
             <ol>
-              <li>
-                <span>1</span>
-                <div>
-                  <strong>Leia või loo hange</strong>
-                  <small>Vali ühistule sobiv teenus ja piirkond.</small>
-                </div>
-              </li>
-              <li>
-                <span>2</span>
-                <div>
-                  <strong>Liitu naabritega</strong>
-                  <small>Kinnita tingimused ja maksa testtagatis.</small>
-                </div>
-              </li>
-              <li>
-                <span>3</span>
-                <div>
-                  <strong>Saavuta ühine hind</strong>
-                  <small>Iga järgmine hinnatase toob parema pakkumise.</small>
-                </div>
-              </li>
+              {communitySteps.map(([title, description], index) => (
+                <li key={title}>
+                  <span>{index + 1}</span>
+                  <div>
+                    <strong>{title}</strong>
+                    <small>{description}</small>
+                  </div>
+                </li>
+              ))}
             </ol>
             <a href="#organization" className="text-link">
               Vaata oma organisatsiooni
@@ -1045,7 +1090,7 @@ function ProcurementCard({ procurement }: { procurement: Procurement }) {
     <a href={`#procurement/${procurement.id}`} className="procurement-card">
       <div className="procurement-card-top">
         <span className="snow-icon">
-          {isSnowService(procurement.spec) ? <Snowflake size={21} /> : <Layers3 size={21} />}
+          {isSnowService(procurement.spec) ? <Snowflake size={21} /> : <ClipboardList size={21} />}
         </span>
         <Status status={procurement.status} />
       </div>
@@ -1056,13 +1101,11 @@ function ProcurementCard({ procurement }: { procurement: Procurement }) {
         {procurement.organizationName}
       </p>
       <div className="procurement-card-stats">
-        <div>
-          <strong>
-            {procurement.activeCount}
-            <small> ühistut</small>
-          </strong>
-          <span>Makstud liitumisi</span>
-        </div>
+        <ParticipantProgress
+          paidCount={procurement.activeCount}
+          succeeded={!!procurement.succeededAt}
+          compact
+        />
         <div>
           <strong>{euro(procurement.bestPriceCents)}</strong>
           <span>
@@ -1354,7 +1397,7 @@ function NewProcurement({
         </div>
         <aside className="card form-aside">
           <div className="small-icon">
-            {formId === 'snow' ? <Snowflake size={25} /> : <Layers3 size={25} />}
+            {formId === 'snow' ? <Snowflake size={25} /> : <ClipboardList size={25} />}
           </div>
           <h3>Hea hange on selge.</h3>
           <p>
@@ -1461,7 +1504,26 @@ function ProcurementPage({
       ['PENDING', 'ACTIVE', 'CONTRACTED'].includes(item.status),
   );
   const threshold = selected?.tiers[0].minParticipants || 0;
-  const progress = threshold ? Math.min(100, (procurement.activeCount / threshold) * 100) : 0;
+  const participationHint =
+    procurement.status === 'CANCELLED'
+      ? 'Hange tühistati. Varasem osalemine säilib ajaloos ja makstud TEST tagatised tagastatakse.'
+      : procurement.status === 'FAILED'
+        ? 'Tähtaeg möödus ja vajalik osalejate arv ei täitunud. Makstud TEST tagatised tagastatakse täies ulatuses.'
+        : procurement.status === 'FINALIZED'
+          ? 'Liitumine on lõppenud. Jätkavatele ühistutele on loodud lepingud saavutatud lõpphinnaga.'
+          : procurement.status === 'COMPLETED'
+            ? 'Teenus on lõpetatud. Lepingud, lõpphind ja õnnestumise ajalugu säilivad.'
+            : procurement.succeededAt
+              ? procurement.activeCount < threshold
+                ? open
+                  ? 'Hange õnnestus varem. Saavutatud hind säilib ka pärast loobumisi. Liituda saab tähtajani.'
+                  : 'Hange õnnestus varem. Liitumise tähtaeg on möödunud; saavutatud hind säilib ka pärast loobumisi.'
+                : open
+                  ? 'Eesmärk saavutatud. Liitumine kestab tähtajani; uued liitujad võivad tuua soodsama hinnataseme.'
+                  : 'Hange õnnestus. Liitumise tähtaeg on möödunud; saavutatud hind säilib.'
+              : open
+                ? `Õnnestumiseks on vaja veel ${Math.max(0, threshold - procurement.activeCount)} makstud liitumist.`
+                : 'Liitumise tähtaeg on möödunud. Hanke tulemus ja TEST tagatiste arvestus selguvad tähtaja töötlemisel.';
   return (
     <>
       <a href="#procurements" className="back-link">
@@ -1751,18 +1813,12 @@ function ProcurementPage({
                 <p>
                   Teenusepakkuja: <strong>{selected.supplierName}</strong>
                 </p>
-                <div className="progress-caption">
-                  <strong>{procurement.activeCount} makstud liitumist</strong>
-                  <span>{threshold} ühistut eesmärgiks</span>
-                </div>
-                <div className="progress-track">
-                  <span style={{ width: `${progress}%` }} />
-                </div>
-                <small className="progress-hint">
-                  {procurement.succeededAt
-                    ? 'Eesmärk saavutatud. Uued liitujad võivad viia järgmise hinnatasemeni.'
-                    : `Õnnestumiseks on vaja veel ${Math.max(0, threshold - procurement.activeCount)} makstud liitumist.`}
-                </small>
+                <ParticipantProgress
+                  paidCount={procurement.activeCount}
+                  threshold={threshold}
+                  succeeded={!!procurement.succeededAt}
+                />
+                <small className="progress-hint">{participationHint}</small>
                 <div className="summary-line">
                   <span>Testtagatisraha</span>
                   <strong>{euro(selected.depositCents)}</strong>
@@ -2355,27 +2411,27 @@ function CoordinateMap({
       >
         <defs>
           <pattern id="map-grid" width="40" height="40" patternUnits="userSpaceOnUse">
-            <path d="M40 0H0V40" fill="none" stroke="#dae6e4" strokeWidth="1" />
+            <path d="M40 0H0V40" fill="none" stroke="var(--stone)" strokeWidth="1" />
           </pattern>
           <clipPath id="map-clip">
-            <rect width="520" height="380" rx="14" />
+            <rect width="520" height="380" rx="10" />
           </clipPath>
         </defs>
-        <rect width="520" height="380" fill="#edf4f1" />
+        <rect width="520" height="380" fill="var(--paper)" />
         <rect width="520" height="380" fill="url(#map-grid)" />
         <g clipPath="url(#map-clip)">
           <circle
             cx="260"
             cy="190"
             r={170 * zoom}
-            fill="#d9efe8"
+            fill="var(--sage-surface)"
             fillOpacity="0.75"
-            stroke="#5bab9d"
+            stroke="var(--sage)"
             strokeWidth="1.5"
             strokeDasharray="5 5"
           />
-          <line x1="260" y1="15" x2="260" y2="365" stroke="#b7ccc6" strokeDasharray="3 5" />
-          <line x1="25" y1="190" x2="495" y2="190" stroke="#b7ccc6" strokeDasharray="3 5" />
+          <line x1="260" y1="15" x2="260" y2="365" stroke="var(--stone)" strokeDasharray="3 5" />
+          <line x1="25" y1="190" x2="495" y2="190" stroke="var(--stone)" strokeDasharray="3 5" />
           {nearby.map((item) => {
             const p = point(item);
             return (
@@ -2384,6 +2440,7 @@ function CoordinateMap({
                 role="button"
                 tabIndex={0}
                 aria-label={`${item.name}, ${Math.round(item.distanceM)} meetrit`}
+                aria-pressed={selected === item.id}
                 className="map-point"
                 onClick={() => setSelected(item.id)}
                 onKeyDown={(event) => {
@@ -2400,8 +2457,8 @@ function CoordinateMap({
                   cx={p.x}
                   cy={p.y}
                   r={selected === item.id ? 14 : 11}
-                  fill={selected === item.id ? '#122b40' : '#258a78'}
-                  stroke="white"
+                  fill={selected === item.id ? 'var(--clay-dark)' : 'var(--clay)'}
+                  stroke={selected === item.id ? 'var(--forest)' : 'var(--paper)'}
                   strokeWidth="3"
                 />
                 <path
@@ -2418,7 +2475,7 @@ function CoordinateMap({
             cx="260"
             cy="190"
             r="21"
-            fill="#122b40"
+            fill="var(--forest)"
             stroke="white"
             strokeWidth="4"
           />
@@ -2430,10 +2487,10 @@ function CoordinateMap({
             strokeWidth="2"
           />
         </g>
-        <text x="22" y="352" fill="#6e8580" fontSize="10">
+        <text x="22" y="352" fill="var(--muted)" fontSize="10">
           {Math.round(radius)} m skaalaraadius
         </text>
-        <text x="480" y="30" fill="#122b40" fontSize="12" fontWeight="700">
+        <text x="480" y="30" fill="var(--forest)" fontSize="12" fontWeight="700">
           N ↑
         </text>
       </svg>
@@ -2446,8 +2503,8 @@ function CoordinateMap({
           <span>Vali kaardil ühistu, et vaadata kaugust.</span>
         )}
         <small>
-          Tume tähis: hanke algataja. Kutseraadius {procurement.radiusM} m. Lähestikku tähised on
-          nihutatud.
+          Suur roheline tähis: hanke algataja. Kutseraadius {procurement.radiusM} m. Lähestikku
+          tähised on nihutatud.
         </small>
       </div>
     </div>

@@ -68,3 +68,7 @@ Run the normal Compose rebuild to apply versioned migrations and keep the databa
 ## Service demo upgrade
 
 The standard bootstrap adds four fictional service procurements (pest control, energy certificates, branch cleanup and free-form service) with stable identities. Repeated startup preserves their lifecycle and financial history and creates no duplicate examples. This extension uses the existing JSONB specification storage and does not rewrite legacy snow records. Rebuild Compose normally; no volume reset is required.
+
+## CVI design upgrade
+
+Rebuild Compose normally to serve the new CSS, branding and locally bundled fonts. No migration or database reset is required. Font licenses ship in public/fonts; the browser requests those assets from the portal's own origin. Existing users, read receipts, procurements and financial history are preserved. A browser refresh loads the new hashed production assets.

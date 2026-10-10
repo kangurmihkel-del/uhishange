@@ -15,6 +15,8 @@ function observe(page) {
   });
 }
 async function snapshot(page, name) {
+  await page.evaluate(() => document.fonts.ready);
+  await page.evaluate(() => window.scrollTo({ top: 0, left: 0, behavior: 'instant' }));
   await page.screenshot({ path: resolve(output, name + '.png'), fullPage: true });
   screenshots.push(name);
   const dimensions = await page.evaluate(() => ({
@@ -30,6 +32,16 @@ try {
   await page.goto('/');
   await expect(page.getByRole('button', { name: 'Ostja', exact: true })).toBeVisible();
   await snapshot(page, 'login-desktop');
+  const publicNav = page.getByRole('navigation', { name: 'Avalik navigatsioon' });
+  await publicNav.getByRole('link', { name: 'Teenused', exact: true }).click();
+  await expect(page.locator('#services')).toBeInViewport();
+  await snapshot(page, 'public-services-desktop');
+  await publicNav.getByRole('link', { name: 'Kuidas toimib', exact: true }).click();
+  await expect(page.locator('#how-it-works')).toBeInViewport();
+  await snapshot(page, 'public-process-desktop');
+  await publicNav.getByRole('link', { name: 'Teenusepakkujale', exact: true }).click();
+  await expect(page.locator('#for-suppliers')).toBeInViewport();
+  await snapshot(page, 'public-provider-desktop');
   await page.getByRole('button', { name: 'Ostja', exact: true }).click();
   await expect(page.getByRole('heading', { name: /^Tere,/ })).toBeVisible();
   const list = await page.request.get('/api/v1/procurements');
@@ -102,6 +114,9 @@ try {
   await phone.goto('/#procurement/' + demo.id);
   await expect(phone.getByRole('heading', { name: demo.title, exact: true })).toBeVisible();
   await snapshot(phone, 'procurement-mobile');
+  await phone.getByRole('button', { name: /^Naabrid ja kutsed/ }).click();
+  await expect(phone.getByRole('img', { name: /Hanke keskpunkt/ })).toBeVisible();
+  await snapshot(phone, 'neighbors-mobile');
   await phone.getByRole('button', { name: 'Logi välja', exact: true }).click();
   await phone.getByRole('button', { name: 'Naaberühistu', exact: true }).click();
   await phone.goto('/#mailbox');

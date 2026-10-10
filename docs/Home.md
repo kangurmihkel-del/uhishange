@@ -6,6 +6,8 @@ Owner: project maintainer. This repository implements a local functional pilot f
 - [Architecture decisions](ADR/0001-local-pilot.md)
 - [Mailbox and guided procurement decision](ADR/0002-mailbox-and-guided-procurement.md)
 - [Versioned service specification decision](ADR/0003-versioned-service-specifications.md)
+- [Visual identity](Features/VisualIdentity.md)
+- [CVI design decision](ADR/0004-cvi-design.md)
 - [API](API/README.md)
 - [Test scenarios](Testing/README.md)
 - [Development](Development/README.md)

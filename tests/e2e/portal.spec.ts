@@ -16,6 +16,7 @@ import type {
   AdminResponse,
   Invitation,
   MailboxResponse,
+  Offer,
   ProcurementDetail,
   SessionResponse,
   ServiceSpec,
@@ -25,6 +26,24 @@ test.afterAll(async () => {
   const { pool } = await import('../../src/server/db.js');
   await pool.end();
 });
+
+async function expectPaidProgress(
+  page: import('@playwright/test').Page,
+  paidCount: number,
+  threshold: number,
+) {
+  const progress = page.getByTestId('participant-progress').getByRole('progressbar', {
+    name: 'Makstud liitumiste eesmärk',
+    exact: true,
+  });
+  await expect(progress).toHaveAttribute('aria-valuemin', '0');
+  await expect(progress).toHaveAttribute('aria-valuemax', String(threshold));
+  await expect(progress).toHaveAttribute('aria-valuenow', String(Math.min(paidCount, threshold)));
+  await expect(progress).toHaveAttribute(
+    'aria-valuetext',
+    paidCount + ' / ' + threshold + ' makstud liitumist',
+  );
+}
 
 test('buyer, supplier and neighboring buyers reach a lower tier through the portal', async ({
   page,
@@ -172,6 +191,7 @@ test('buyer, supplier and neighboring buyers reach a lower tier through the port
       await expect(
         page.getByRole('status').filter({ hasText: 'Ebaõnnestunud testmakse on salvestatud' }),
       ).toBeVisible();
+      await expectPaidProgress(page, 0, 2);
     }
     await expect(
       page.getByText('TESTMAKSE · Tegelikku raha ei liigu', { exact: true }).first(),
@@ -179,6 +199,7 @@ test('buyer, supplier and neighboring buyers reach a lower tier through the port
     await nextAction(page, 'Tee testmakse');
     await page.getByRole('button', { name: 'Kinnita testmakse', exact: true }).click();
     await expect(page.getByText(index + ' makstud liitumist', { exact: true })).toBeVisible();
+    await expectPaidProgress(page, index, 2);
   }
   await expect(page.getByText('Ühine eesmärk on saavutatud!', { exact: true })).toBeVisible();
   await expect(page.getByTestId('current-price')).toContainText(/700\s*€/);
@@ -186,6 +207,7 @@ test('buyer, supplier and neighboring buyers reach a lower tier through the port
   await expect(page.getByText(/Hange on õnnestunud. Loobumisel jääb/)).toBeVisible();
   await page.getByRole('button', { name: 'Kinnita loobumine', exact: true }).click();
   await expect(page.getByText('2 makstud liitumist', { exact: true })).toBeVisible();
+  await expectPaidProgress(page, 2, 2);
   await expect(page.getByTestId('current-price')).toContainText(/700\s*€/);
   await page.getByText('Liitumisel kinnitatud tingimused', { exact: true }).click();
   await expect(page.getByTestId('agreement-history')).toContainText('Liitumine kinnitatud');
@@ -200,6 +222,21 @@ test('buyer, supplier and neighboring buyers reach a lower tier through the port
   const invitation = page.getByTestId('invitation-card').filter({ hasText: title });
   await invitation.getByRole('button', { name: 'Võta kutse vastu', exact: true }).click();
   await expect(invitation).toContainText('Vastu võetud');
+  await logout(page);
+  await login(page, 'buyer2@demo.test');
+  await page.goto('/#procurement/' + id);
+  await page.getByRole('button', { name: 'Loobu hankest', exact: true }).click();
+  await page.getByRole('button', { name: 'Kinnita loobumine', exact: true }).click();
+  await expect(page.getByText('1 makstud liitumist', { exact: true })).toBeVisible();
+  await expectPaidProgress(page, 1, 2);
+  await expect(page.getByText('Ühine eesmärk on saavutatud!', { exact: true })).toBeVisible();
+  await expect(page.getByTestId('current-price')).toContainText(/700\s*€/);
+  const belowThreshold = await api<ProcurementDetail>(page.request, '/procurements/' + id);
+  expect(belowThreshold.procurement.activeCount).toBe(1);
+  expect(belowThreshold.procurement.status).toBe('SUCCEEDED');
+  expect(belowThreshold.procurement.succeededAt).toBe(final.procurement.succeededAt);
+  expect(belowThreshold.procurement.bestPriceCents).toBe(70_000);
+  await expectResponsive(page);
 });
 
 test('registration, organization approval, atomic CSV import and job retry are usable', async ({
@@ -210,7 +247,59 @@ test('registration, organization approval, atomic CSV import and job retry are u
   const email = 'browser-' + Date.now() + '@test.local';
   const organizationName = uniqueTitle('Brauseri uus KÜ');
   await page.goto('/');
-  await page.getByRole('button', { name: 'Loo konto', exact: true }).click();
+  const publicNavigation = page.getByRole('navigation', {
+    name: 'Avalik navigatsioon',
+    exact: true,
+  });
+  await expect(publicNavigation).toBeVisible();
+  await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible();
+  const fonts = await page.evaluate(async () => {
+    await document.fonts.ready;
+    const loaded = await Promise.all([
+      document.fonts.load('600 16px Lora', 'Ühishange Šaakal žürii'),
+      document.fonts.load('400 16px "Work Sans"', 'Ühishange Šaakal žürii'),
+    ]);
+    return {
+      faces: loaded.map((faces) => ({
+        count: faces.length,
+        loaded: faces.every((face) => face.status === 'loaded'),
+      })),
+      heading: getComputedStyle(document.querySelector('h1')!).fontFamily,
+      body: getComputedStyle(document.body).fontFamily,
+      fontRequests: performance
+        .getEntriesByType('resource')
+        .map((entry) => entry.name)
+        .filter((url) => /\.(woff2?|ttf|otf)$/.test(new URL(url).pathname)),
+      origin: location.origin,
+    };
+  });
+  expect(fonts.faces.every((family) => family.count > 0 && family.loaded)).toBe(true);
+  expect(fonts.heading).toContain('Lora');
+  expect(fonts.body).toContain('Work Sans');
+  expect(fonts.fontRequests.length).toBeGreaterThan(0);
+  expect(fonts.fontRequests.every((url) => new URL(url).origin === fonts.origin)).toBe(true);
+
+  const initialHash = new URL(page.url()).hash;
+  for (const [label, target] of [
+    ['Teenused', 'services'],
+    ['Kuidas toimib', 'how-it-works'],
+    ['Teenusepakkujale', 'for-suppliers'],
+  ]) {
+    const link = publicNavigation.getByRole('link', { name: label, exact: true });
+    await expect(link).toHaveAttribute('href', '#' + target);
+    await link.click();
+    const section = page.locator('#' + target);
+    await expect(section).toBeVisible();
+    await expect(section).toBeInViewport();
+    await expect(section).toBeFocused();
+    expect(new URL(page.url()).hash).toBe(initialHash);
+    await expectResponsive(page);
+  }
+  const start = page.getByTestId('public-start');
+  await expect(start).toHaveAccessibleName('Alusta ühishanget');
+  await start.click();
+  await expect(page.getByLabel('Nimi', { exact: true })).toBeFocused();
+  await expectResponsive(page);
   await page.getByLabel('Nimi', { exact: true }).fill('Brauseri esindaja');
   await page.getByLabel('E-post', { exact: true }).fill(email);
   await page.getByLabel('Parool', { exact: false }).fill(registrationPassword);
@@ -745,4 +834,37 @@ test('source service types use conditional questions, clear stale answers and re
         'formId' in row.acceptanceSnapshot.spec && row.acceptanceSnapshot.spec.formId === 'pest',
     ),
   ).toBe(true);
+  const branches = created.find((item) => item.formId === 'branches')!;
+  const supplier = await api<SessionResponse>(page.request, '/login', {
+    email: 'supplier@demo.test',
+    password: 'Demo2026!',
+  });
+  const supplierId = supplier.memberships.find(
+    (membership) =>
+      membership.status === 'approved' &&
+      membership.role === 'representative' &&
+      membership.organization.orgType === 'SUPPLIER',
+  )!.organizationId;
+  const { offer } = await api<{ offer: Offer }>(
+    page.request,
+    '/procurements/' + branches.id + '/offers',
+    {
+      organizationId: supplierId,
+      basePriceCents: 100_000,
+      depositCents: 10_003,
+      terms: 'Okste koristamine vastavalt ühisele tööde ulatusele.',
+      validUntil: new Date(Date.now() + 14 * 86_400_000).toISOString(),
+      tiers: [{ minParticipants: 1000, priceCents: 90_000 }],
+    },
+  );
+  await api(page.request, '/login', { email: 'buyer1@demo.test', password: 'Demo2026!' });
+  await api(page.request, '/procurements/' + branches.id + '/select-offer', { offerId: offer.id });
+  await page.goto('/#procurement/' + branches.id);
+  await page.reload();
+  await expect(page.getByRole('heading', { name: branches.title, exact: true })).toBeVisible();
+  await expectPaidProgress(page, 0, 1000);
+  const dots = page.getByTestId('participant-progress').getByTestId('participant-dot');
+  expect(await dots.count()).toBeGreaterThan(0);
+  expect(await dots.count()).toBeLessThanOrEqual(20);
+  await expectResponsive(page);
 });

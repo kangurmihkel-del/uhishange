@@ -53,6 +53,8 @@ Before success, withdrawal refunds the deposit. After success, withdrawal retain
 
 ## Develop and verify
 
+The portal follows the supplied CVI: warm backgrounds, forest green navigation, clay map markers, local Lora/Work Sans fonts and dot participation indicators. Public service, process and supplier links explain the existing pilot flow. [Visual identity](docs/Features/VisualIdentity.md) records the design requirements and [font inventory](public/fonts/README.md) records bundled assets and licenses.
+
 Install Node 24, start the database, then install dependencies:
 
 ```powershell
