@@ -8,7 +8,7 @@ import { resolve } from 'node:path';
 import pg from 'pg';
 import { chromium, expect } from '@playwright/test';
 
-// Real-UI recordings: a calm detailed version and a concise three-step version.
+// Real-UI recordings: naturally paced detailed and concise role journeys.
 // Both exclude administrator work and run against separate databases.
 const runId = Date.now().toString();
 const databaseName = `uhishange_role_demo_${runId}`;
@@ -17,26 +17,33 @@ const output = resolve('recordings', runId);
 const mode = process.env.DEMO_MODE || 'slow';
 assert.ok(['slow', 'concise'].includes(mode), 'DEMO_MODE must be slow or concise');
 const concise = mode === 'concise';
-const targetSeconds = concise ? 60 : 110;
+const targetSeconds = concise ? 60 : 90;
 const timings = concise
   ? {
-      request: 5500,
+      request: 4000,
       neighbors: 4000,
-      offer: 6500,
-      sendFocus: 13000,
-      comparison: 5500,
-      selected: 6500,
+      offer: 5000,
+      sendFocus: 10000,
+      comparison: 5000,
+      selected: 4000,
     }
   : {
-      request: 12000,
-      neighbors: 10000,
-      offer: 15000,
-      sendFocus: 25000,
-      comparison: 15000,
-      selected: 12000,
+      request: 8000,
+      neighbors: 8000,
+      offer: 9000,
+      sendFocus: 15000,
+      comparison: 9000,
+      selected: 7000,
     };
-const versionLabel = concise ? '60-second concise role demo' : '110-second detailed role demo';
-const videoStem = concise ? 'uhishange-role-demo-concise-60s' : 'uhishange-role-demo-detailed-110s';
+const navigation = concise
+  ? { beforeClick: 150, afterClick: 480, field: 170, scroll: 320 }
+  : { beforeClick: 190, afterClick: 560, field: 210, scroll: 380 };
+const versionLabel = concise
+  ? '60-second concise naturally paced role demo'
+  : '90-second detailed naturally paced role demo';
+const videoStem = concise
+  ? 'uhishange-role-demo-concise-60s-natural'
+  : 'uhishange-role-demo-detailed-90s-natural';
 const mainURL = new URL(
   process.env.DATABASE_URL || 'postgres://uhishange:uhishange@localhost:54329/uhishange',
 );
@@ -96,7 +103,7 @@ async function checkPort() {
 }
 
 const elapsed = () => (Date.now() - started) / 1000;
-const pause = (milliseconds = 220) => page.waitForTimeout(milliseconds);
+const pause = (milliseconds = navigation.afterClick) => page.waitForTimeout(milliseconds);
 const button = (name, scope = page) => scope.getByRole('button', { name, exact: true });
 const label = (name) => page.getByLabel(name, { exact: true });
 const escape = (value) => value.replace(/[.*+?^{}()|[\]\\$]/g, '\\$&');
@@ -107,9 +114,9 @@ async function reveal(locator) {
   const box = await locator.boundingBox();
   if (!box || box.y < 70 || box.y + box.height > 830) {
     await locator.evaluate((element) =>
-      element.scrollIntoView({ block: 'center', behavior: 'instant' }),
+      element.scrollIntoView({ block: 'center', behavior: 'smooth' }),
     );
-    await pause(120);
+    await pause(navigation.scroll);
   }
 }
 
@@ -118,15 +125,16 @@ async function click(locator) {
   const box = await locator.boundingBox();
   assert.ok(box);
   await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2, { steps: 7 });
+  await pause(navigation.beforeClick);
   await locator.click();
-  await pause();
+  await pause(navigation.afterClick);
 }
 
 async function fill(locator, value) {
   await reveal(locator);
   await locator.fill(value);
   await locator.press('Tab');
-  await pause(110);
+  await pause(navigation.field);
 }
 
 async function navigate(name) {
@@ -467,6 +475,7 @@ try {
         roles: { client: '♔', supplier: '♞' },
         supplierOfferFieldsPrefilled: true,
         mode,
+        naturallyPacedNavigation: true,
         offerSubmissionSpotlightSeconds: timings.sendFocus / 1000,
         browserErrors: errors,
         procurement: procurementRows[0],
@@ -485,7 +494,7 @@ try {
   );
   await writeFile(
     resolve(output, 'README.md'),
-    `# Ühishange ${versionLabel}\n\nThis real-UI recording excludes administrator work. It shows a client (♔) creating a prefilled request, then a supplier (♞) submitting a prefilled offer. The submission button is deliberately highlighted for ${timings.sendFocus / 1000} seconds. ${concise ? 'The concise version skips the neighbor-map sequence.' : 'The detailed version also shows the neighbor-map invitation sequence.'} All activity is fictional and uses the TEST environment.\n`,
+    `# Ühishange ${versionLabel}\n\nThis real-UI recording excludes administrator work. It shows a client (♔) creating a prefilled request, selecting a neighboring association on the map, then a supplier (♞) submitting a prefilled offer. Navigation is deliberately slower while the static form and result views are shorter. The submission button is highlighted for ${timings.sendFocus / 1000} seconds. All activity is fictional and uses the TEST environment.\n`,
   );
   console.log(`DEMO COMPLETE: ${outputVideo}`);
 } catch (error) {
