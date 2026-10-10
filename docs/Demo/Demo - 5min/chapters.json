@@ -1,0 +1,95 @@
+{
+  "chapters": [
+    {
+      "title": "Ühine tellimus algab siit",
+      "sourceSeconds": 0.102,
+      "videoSeconds": 0.102
+    },
+    {
+      "title": "Ühistu esindaja registreerub",
+      "sourceSeconds": 12.35,
+      "videoSeconds": 12.35
+    },
+    {
+      "title": "Administraator kinnitab esindusõiguse",
+      "sourceSeconds": 39.35,
+      "videoSeconds": 39.35
+    },
+    {
+      "title": "Naaberühistu lisamine CSV-st",
+      "sourceSeconds": 46.554,
+      "videoSeconds": 46.554
+    },
+    {
+      "title": "Algataja kirjeldab hankesoovi",
+      "sourceSeconds": 62.932,
+      "videoSeconds": 62.932
+    },
+    {
+      "title": "Kaart ja kutsed naaberühistutele",
+      "sourceSeconds": 90.448,
+      "videoSeconds": 90.448
+    },
+    {
+      "title": "Pakkuja esitab astmelise hinna",
+      "sourceSeconds": 101.523,
+      "videoSeconds": 101.523
+    },
+    {
+      "title": "Algataja saab pakkumise postkasti",
+      "sourceSeconds": 134.186,
+      "videoSeconds": 134.186
+    },
+    {
+      "title": "Esimene ühistu liitub ja maksab",
+      "sourceSeconds": 143.644,
+      "videoSeconds": 143.644
+    },
+    {
+      "title": "Naaber võtab kutse vastu ja liitub",
+      "sourceSeconds": 162.068,
+      "videoSeconds": 162.068
+    },
+    {
+      "title": "Kolmas ühistu langetab hinna 700 euroni",
+      "sourceSeconds": 188.035,
+      "videoSeconds": 188.035
+    },
+    {
+      "title": "Taustatöö lõpetab liitumise tähtajal",
+      "sourceSeconds": 218.265,
+      "videoSeconds": 218.265
+    },
+    {
+      "title": "Leping ja lõplik hinnaarvestus",
+      "sourceSeconds": 507.949,
+      "videoSeconds": 222.03500000000003
+    },
+    {
+      "title": "Hooaja lõpu ja hinnangu demonstratsioon",
+      "sourceSeconds": 519.246,
+      "videoSeconds": 233.332
+    },
+    {
+      "title": "Administraator kontrollib TEST pearaamatut",
+      "sourceSeconds": 557.019,
+      "videoSeconds": 271.105
+    },
+    {
+      "title": "Püsiv ajalugu ja lõpetatud hange",
+      "sourceSeconds": 564.647,
+      "videoSeconds": 278.73300000000006
+    },
+    {
+      "title": "Ühine hange on lõpetatud",
+      "sourceSeconds": 577.925,
+      "videoSeconds": 292.01099999999997
+    }
+  ],
+  "shortenedWaits": [
+    {
+      "start": 222.027,
+      "end": 507.941
+    }
+  ]
+}

@@ -1,0 +1,1 @@
+[0:v]trim=start=0:end=222.027,setpts=PTS-STARTPTS[a];[0:v]trim=start=507.941:end=587.44,setpts=PTS-STARTPTS[b];[a][b]concat=n=2:v=1:a=0[out]
