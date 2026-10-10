@@ -4,6 +4,7 @@ Owner: project maintainer. This repository implements a local functional pilot f
 
 - [Feature behavior](Features/Procurement.md)
 - [Architecture decisions](ADR/0001-local-pilot.md)
+- [Mailbox and guided procurement decision](ADR/0002-mailbox-and-guided-procurement.md)
 - [API](API/README.md)
 - [Test scenarios](Testing/README.md)
 - [Development](Development/README.md)

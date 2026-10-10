@@ -41,10 +41,26 @@ try {
   await page.goto('/#procurement/' + demo.id);
   await expect(page.getByRole('heading', { name: demo.title, exact: true })).toBeVisible();
   await expect(page.getByText('Valitud pakkumine', { exact: true })).toBeVisible();
+  await expect(
+    page.getByTestId('next-action').getByRole('button', { name: 'Kinnita liitumine', exact: true }),
+  ).toBeVisible();
   await snapshot(page, 'procurement-desktop');
   await page.getByRole('button', { name: /^Naabrid ja kutsed/ }).click();
   await expect(page.getByRole('img', { name: /Hanke keskpunkt/ })).toBeVisible();
   await snapshot(page, 'neighbors-desktop');
+  await page.getByRole('button', { name: 'Logi välja', exact: true }).click();
+  await expect(page.getByRole('button', { name: 'Naaberühistu', exact: true })).toBeVisible();
+  await page.getByRole('button', { name: 'Naaberühistu', exact: true }).click();
+  await page.goto('/#mailbox');
+  await expect(page.getByTestId('mailbox-message').first()).toBeVisible();
+  await snapshot(page, 'mailbox-desktop');
+  await page
+    .getByTestId('mailbox-message')
+    .first()
+    .getByRole('button', { name: 'Ava kiri', exact: true })
+    .click();
+  await expect(page.getByTestId('mailbox-detail')).toBeInViewport();
+  await snapshot(page, 'mailbox-letter-desktop');
   await page.getByRole('button', { name: 'Logi välja', exact: true }).click();
   await expect(page.getByRole('button', { name: 'Administraator', exact: true })).toBeVisible();
   await page.getByRole('button', { name: 'Administraator', exact: true }).click();
@@ -71,6 +87,17 @@ try {
   await phone.goto('/#procurement/' + demo.id);
   await expect(phone.getByRole('heading', { name: demo.title, exact: true })).toBeVisible();
   await snapshot(phone, 'procurement-mobile');
+  await phone.getByRole('button', { name: 'Logi välja', exact: true }).click();
+  await phone.getByRole('button', { name: 'Naaberühistu', exact: true }).click();
+  await phone.goto('/#mailbox');
+  await expect(phone.getByTestId('mailbox-message').first()).toBeVisible();
+  await phone
+    .getByTestId('mailbox-message')
+    .first()
+    .getByRole('button', { name: 'Ava kiri', exact: true })
+    .click();
+  await expect(phone.getByTestId('mailbox-detail')).toBeInViewport();
+  await snapshot(phone, 'mailbox-letter-mobile');
   await mobile.close();
   if (errors.length) throw new Error('Browser errors: ' + errors.join('; '));
   console.log(JSON.stringify({ baseURL, screenshots, browserErrors: errors.length }));

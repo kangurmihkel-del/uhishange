@@ -2148,7 +2148,8 @@ td small {
   margin-bottom: 13px;
 }
 .demo-login > div {
-  display: flex;
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 7px;
 }
 .demo-login .button {
@@ -2861,4 +2862,322 @@ small.join-deposit {
 }
 .agreement-test-note {
   margin-top: 16px;
+}
+
+.nav-unread {
+  margin-left: auto;
+  min-width: 22px;
+  padding: 2px 5px;
+  border-radius: 12px;
+  text-align: center;
+  background: var(--teal);
+  color: white;
+  font-size: 11px;
+  font-weight: 700;
+}
+.topbar-mail-dot {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  width: 7px;
+  height: 7px;
+  background: var(--teal);
+  border-radius: 50%;
+}
+.topbar-actions .icon-button {
+  position: relative;
+}
+.procurement-flow {
+  margin-bottom: 24px;
+}
+.flow-heading {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 12px;
+  color: var(--muted);
+  font-size: 12px;
+}
+.flow-steps {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  list-style: none;
+  padding: 0;
+  margin: 23px 0;
+  gap: 12px;
+}
+.flow-steps li {
+  display: flex;
+  gap: 9px;
+  align-items: center;
+  font-size: 12px;
+  color: #677988;
+  line-height: 1.5;
+}
+.flow-step-number {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 29px;
+  height: 29px;
+  flex-shrink: 0;
+  border: 1px solid var(--line);
+  border-radius: 50%;
+  color: #637988;
+  font-weight: 700;
+}
+.flow-steps .done .flow-step-number {
+  background: #eaf5f1;
+  border-color: #c5e5da;
+  color: var(--teal);
+}
+.flow-steps .current {
+  color: var(--navy);
+  font-weight: 700;
+}
+.flow-steps .current .flow-step-number {
+  background: var(--teal);
+  color: white;
+  border-color: var(--teal);
+}
+.flow-next {
+  background: #eef8f5;
+  border: 1px solid #cde8df;
+  border-radius: 12px;
+  padding: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 25px;
+}
+.flow-next h2 {
+  font-size: 20px;
+  margin: 6px 0 8px;
+  line-height: 1.4;
+}
+.flow-next p {
+  font-size: 13px;
+  color: #476474;
+  line-height: 1.7;
+  margin: 0;
+  max-width: 730px;
+}
+.flow-next > .button {
+  flex-shrink: 0;
+}
+.flow-shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 22px;
+  margin-top: 18px;
+}
+.flow-shortcuts .text-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.flow-shortcuts button,
+.mailbox-message-actions button.text-link,
+.mailbox-detail > button.text-link {
+  border: 0;
+  background: transparent;
+  padding: 0;
+  min-height: 32px;
+  cursor: pointer;
+  text-align: left;
+}
+#procurement-work,
+#procurement-join,
+#procurement-offer-form {
+  scroll-margin-top: 85px;
+}
+.mailbox-count {
+  background: #eaf5f1;
+  color: var(--teal);
+  padding: 9px 15px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 700;
+}
+.mailbox-layout {
+  display: grid;
+  gap: 22px;
+}
+.mailbox-layout.has-detail {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.1fr);
+  align-items: start;
+}
+.mailbox-list {
+  display: grid;
+  gap: 14px;
+  min-width: 0;
+}
+.mailbox-message {
+  padding: 22px;
+  min-width: 0;
+}
+.mailbox-message.unread {
+  border-left: 4px solid var(--teal);
+}
+.mailbox-message.selected {
+  border-color: var(--teal);
+}
+.mailbox-message-meta {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  color: #647c8b;
+  font-size: 11px;
+}
+.mailbox-message h2 {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  font-size: 16px;
+  margin: 13px 0 8px;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+}
+.mailbox-message h2 svg {
+  flex-shrink: 0;
+  margin-top: 3px;
+  color: var(--teal);
+}
+.mailbox-message > p {
+  font-size: 12px;
+  color: #526d7d;
+  line-height: 1.7;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.mailbox-message-actions,
+.mailbox-detail-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 15px;
+  margin-top: 17px;
+}
+.mailbox-message-actions .text-link,
+.mailbox-read {
+  font-size: 12px;
+}
+.mailbox-read {
+  color: #6b8190;
+  display: flex;
+  gap: 5px;
+  align-items: center;
+}
+.mailbox-detail {
+  position: sticky;
+  top: 86px;
+  overflow-wrap: anywhere;
+  min-width: 0;
+  scroll-margin-top: 85px;
+}
+.mailbox-detail > .text-link {
+  display: block;
+  margin-bottom: 25px;
+}
+.mailbox-detail > h2 {
+  font-size: 22px;
+  line-height: 1.5;
+  margin-top: 8px;
+}
+.mailbox-detail > p {
+  color: #476474;
+  font-size: 14px;
+  line-height: 1.85;
+  margin: 25px 0;
+}
+.mailbox-envelope {
+  display: grid;
+  gap: 12px;
+  padding: 18px 0;
+  border-top: 1px solid var(--line);
+  border-bottom: 1px solid var(--line);
+}
+.mailbox-envelope > div {
+  display: grid;
+  grid-template-columns: 75px minmax(0, 1fr);
+  gap: 12px;
+  font-size: 12px;
+}
+.mailbox-envelope dt {
+  color: #6b8190;
+}
+.mailbox-envelope dd {
+  margin: 0;
+  color: var(--navy);
+  font-weight: 600;
+}
+.mailbox-invitation {
+  background: #f1f7f8;
+  border-radius: 10px;
+  padding: 18px;
+}
+.mailbox-invitation > p {
+  font-size: 12px;
+  color: #526d7d;
+  line-height: 1.75;
+}
+@media (max-width: 1100px) {
+  .flow-next {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  .flow-steps {
+    gap: 7px;
+  }
+  .flow-steps li {
+    font-size: 10px;
+  }
+}
+@media (max-width: 760px) {
+  .flow-steps {
+    grid-template-columns: 1fr;
+    gap: 10px;
+    margin: 18px 0;
+  }
+  .flow-steps li {
+    font-size: 12px;
+  }
+  .flow-step-number {
+    width: 25px;
+    height: 25px;
+  }
+  .flow-next {
+    padding: 18px;
+    gap: 17px;
+  }
+  .flow-next h2 {
+    font-size: 18px;
+  }
+  .flow-next > .button {
+    width: 100%;
+    white-space: normal;
+  }
+  .flow-shortcuts {
+    gap: 15px;
+  }
+  .procurement-flow {
+    padding: 20px;
+  }
+  .mailbox-layout.has-detail {
+    grid-template-columns: 1fr;
+  }
+  .mailbox-detail {
+    position: static;
+    order: -1;
+  }
+  .mailbox-message {
+    padding: 19px;
+  }
+  .mailbox-detail-links > .button {
+    width: 100%;
+  }
 }

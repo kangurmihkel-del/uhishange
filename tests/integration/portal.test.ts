@@ -4,7 +4,10 @@ import type {
   Contract,
   ImportPreview,
   Invitation,
+  MailboxMessageKind,
+  MailboxResponse,
   Membership,
+  Offer,
   Organization,
   Procurement,
   SessionResponse,
@@ -48,6 +51,16 @@ async function ledger(procurementId: string) {
 async function finalize() {
   const { processDueProcurements } = await import('../../src/server/domain.js');
   await processDueProcurements();
+}
+
+async function mailbox(client: Client, procurementId?: string, kind?: MailboxMessageKind) {
+  const response = await client.get<MailboxResponse>('/mailbox');
+  expect(response.unreadCount).toBe(response.messages.filter((message) => !message.readAt).length);
+  return response.messages.filter(
+    (message) =>
+      (!procurementId || message.procurementId === procurementId) &&
+      (!kind || message.kind === kind),
+  );
 }
 
 describe('accounts, organizations and authorization', () => {
@@ -324,6 +337,235 @@ describe('discovery, invitations and offer selection', () => {
   });
 });
 
+describe('durable organization mailbox', () => {
+  it('deduplicates invitations and persists private per-user reads without granting authority', async () => {
+    await runtime.anonymous.error('GET', '/mailbox', undefined, 401);
+    const seed = (await mailbox(runtime.buyers[1])).find(
+      (message) => message.kind === 'INVITATION' && message.invitation?.status === 'PENDING',
+    );
+    expect(seed).toBeDefined();
+    expect(seed!.organizationId).toBe(runtime.buyers[1].organization.id);
+    expect(seed!.procurementTitle).toBe(seed!.invitation!.procurementTitle);
+    expect(seed!.audience).toBe('MEMBERS');
+    await runtime.anonymous.error('POST', '/mailbox/' + seed!.id + '/read', {}, 401);
+
+    const p = await procurement(runtime.buyers[0]);
+    await runtime.buyers[0].post('/procurements/' + p.id + '/publish');
+    const invitationInput = { organizationIds: [runtime.buyers[1].organization.id] };
+    await runtime.buyers[0].post('/procurements/' + p.id + '/invitations', invitationInput);
+    await runtime.buyers[0].post('/procurements/' + p.id + '/invitations', invitationInput);
+    const messages = await mailbox(runtime.buyers[1], p.id, 'INVITATION');
+    expect(messages).toHaveLength(1);
+    const message = messages[0];
+    expect(message.readAt).toBeNull();
+    expect(message.subject.length).toBeGreaterThan(0);
+    expect(message.body.length).toBeGreaterThan(0);
+    expect(message.invitation?.organizationId).toBe(runtime.buyers[1].organization.id);
+    expect(message.invitation?.distanceM).toBeGreaterThan(0);
+    expect(JSON.stringify(message)).not.toContain('buyer2@demo.test');
+    expect(await mailbox(runtime.buyers[2], p.id)).toHaveLength(0);
+    await runtime.buyers[2].error('POST', '/mailbox/' + message.id + '/read', {}, 404);
+    await runtime.buyers[1].error(
+      'POST',
+      '/mailbox/00000000-0000-4000-8000-000000000000/read',
+      {},
+      404,
+    );
+
+    const viewer = new Client(runtime.baseUrl);
+    const viewerEmail = unique('mailbox-viewer') + '@test.local';
+    await viewer.post('/register', {
+      name: 'Postkasti vaatleja',
+      email: viewerEmail,
+      password: registrationPassword,
+    });
+    const requested = await viewer.post<{ membership: Membership }>(
+      '/organizations/' + runtime.buyers[1].organization.id + '/membership',
+      { role: 'viewer' },
+    );
+    expect(await mailbox(viewer)).toHaveLength(0);
+    await viewer.error('POST', '/mailbox/' + message.id + '/read', {}, 404);
+    await runtime.admin.post('/admin/memberships/' + requested.membership.id, {
+      status: 'approved',
+    });
+    expect((await mailbox(viewer, p.id))[0].readAt).toBeNull();
+    const viewed = await viewer.post<{ message: MailboxResponse['messages'][number] }>(
+      '/mailbox/' + message.id + '/read',
+    );
+    expect(viewed.message.readAt).not.toBeNull();
+    expect((await mailbox(runtime.buyers[1], p.id))[0].readAt).toBeNull();
+    await viewer.error(
+      'POST',
+      '/invitations/' + message.invitation!.id + '/respond',
+      { status: 'ACCEPTED' },
+      403,
+    );
+    const beforeReading = await runtime.buyers[1].get<MailboxResponse>('/mailbox');
+    const readResponses = await Promise.all([
+      runtime.buyers[1].post<{ message: MailboxResponse['messages'][number] }>(
+        '/mailbox/' + message.id + '/read',
+      ),
+      runtime.buyers[1].post<{ message: MailboxResponse['messages'][number] }>(
+        '/mailbox/' + message.id + '/read',
+      ),
+    ]);
+    expect(readResponses[0].message.readAt).not.toBeNull();
+    expect(readResponses[1].message.readAt).toBe(readResponses[0].message.readAt);
+    expect((await runtime.buyers[1].get<MailboxResponse>('/mailbox')).unreadCount).toBe(
+      beforeReading.unreadCount - 1,
+    );
+    await expect(
+      runtime.pool.query('UPDATE mailbox_messages SET body=$1 WHERE id=$2', [
+        'Rewritten message',
+        message.id,
+      ]),
+    ).rejects.toThrow('Append-only');
+    await expect(
+      runtime.pool.query('DELETE FROM mailbox_reads WHERE user_id=$1 AND message_id=$2', [
+        runtime.buyers[1].session.user!.id,
+        message.id,
+      ]),
+    ).rejects.toThrow('Append-only');
+    await runtime.buyers[1].post('/logout');
+    await runtime.buyers[1].post('/login', { email: 'buyer2@demo.test', password });
+    expect((await mailbox(runtime.buyers[1], p.id))[0].readAt).toBe(
+      readResponses[0].message.readAt,
+    );
+    const { bootstrap } = await import('../../src/server/bootstrap.js');
+    await bootstrap({ seed: true });
+    expect(await mailbox(runtime.buyers[1], p.id, 'INVITATION')).toHaveLength(1);
+    expect((await mailbox(runtime.buyers[1], p.id))[0].readAt).toBe(
+      readResponses[0].message.readAt,
+    );
+    const inspection = await mailbox(runtime.admin, p.id, 'INVITATION');
+    expect(inspection).toHaveLength(1);
+    expect(inspection[0].readAt).toBeNull();
+    await runtime.admin.post('/mailbox/' + message.id + '/read');
+    expect((await mailbox(runtime.buyers[1], p.id))[0].readAt).toBe(
+      readResponses[0].message.readAt,
+    );
+    await runtime.buyers[1].post('/invitations/' + message.invitation!.id + '/respond', {
+      status: 'ACCEPTED',
+    });
+    expect((await mailbox(runtime.buyers[1], p.id))[0].invitation?.status).toBe('ACCEPTED');
+    expect((await detail(runtime.buyers[1], p.id)).commitments).toHaveLength(0);
+    await runtime.buyers[1].error('POST', '/procurements/' + p.id + '/publish', {}, 403);
+  });
+
+  it('delivers offer and TEST payment messages to the correct audiences without replay duplicates', async () => {
+    const p = await procurement(runtime.buyers[0]);
+    await runtime.buyers[0].post('/procurements/' + p.id + '/publish');
+    await runtime.buyers[0].post('/procurements/' + p.id + '/invitations', {
+      organizationIds: [runtime.buyers[1].organization.id, runtime.supplier.organization.id],
+    });
+    const offerInput = {
+      organizationId: runtime.supplier.organization.id,
+      basePriceCents: 100_000,
+      depositCents: 10_003,
+      terms: 'Postkasti hanke tingimused.',
+      validUntil: future(172_800_000),
+      tiers: [{ minParticipants: 2, priceCents: 90_000 }],
+    };
+    const { offer } = await runtime.supplier.post<{ offer: Offer }>(
+      '/procurements/' + p.id + '/offers',
+      offerInput,
+    );
+    expect(await mailbox(runtime.buyers[0], p.id, 'OFFER_SUBMITTED')).toHaveLength(1);
+    expect(await mailbox(runtime.buyers[1], p.id, 'OFFER_SUBMITTED')).toHaveLength(0);
+    await runtime.buyers[0].post('/procurements/' + p.id + '/select-offer', { offerId: offer.id });
+    await runtime.buyers[0].post('/procurements/' + p.id + '/select-offer', { offerId: offer.id });
+    expect(await mailbox(runtime.supplier, p.id, 'OFFER_SELECTED')).toHaveLength(1);
+    expect(await mailbox(runtime.buyers[1], p.id, 'OFFER_SELECTED')).toHaveLength(1);
+
+    const first = await commit(runtime.buyers[0], p.id);
+    const failedEvent = unique('mailbox-failed');
+    await runtime.buyers[0].post('/test-payments/' + first.id, {
+      outcome: 'failed',
+      eventId: failedEvent,
+    });
+    await runtime.buyers[0].post('/test-payments/' + first.id, {
+      outcome: 'failed',
+      eventId: failedEvent,
+    });
+    const failed = await mailbox(runtime.buyers[0], p.id, 'TEST_PAYMENT_FAILED');
+    expect(failed).toHaveLength(1);
+    expect(failed[0].audience).toBe('REPRESENTATIVES');
+    expect(failed[0].subject + ' ' + failed[0].body).toMatch(/TEST/);
+    const capturedEvent = unique('mailbox-captured');
+    await capture(runtime.buyers[0], first.id, capturedEvent);
+    await capture(runtime.buyers[0], first.id, capturedEvent);
+    await capture(runtime.buyers[0], first.id, unique('mailbox-capture-replay'));
+    const captured = await mailbox(runtime.buyers[0], p.id, 'TEST_PAYMENT_CAPTURED');
+    expect(captured).toHaveLength(1);
+    expect(captured[0].audience).toBe('REPRESENTATIVES');
+    expect(captured[0].subject + ' ' + captured[0].body).toMatch(/TEST/);
+    expect(await mailbox(runtime.buyers[1], p.id, 'TEST_PAYMENT_CAPTURED')).toHaveLength(0);
+
+    const viewer = new Client(runtime.baseUrl);
+    await viewer.post('/register', {
+      name: 'Finantsteadete vaatleja',
+      email: unique('payment-viewer') + '@test.local',
+      password: registrationPassword,
+    });
+    const requested = await viewer.post<{ membership: Membership }>(
+      '/organizations/' + runtime.buyers[0].organization.id + '/membership',
+      { role: 'viewer' },
+    );
+    await runtime.admin.post('/admin/memberships/' + requested.membership.id, {
+      status: 'approved',
+    });
+    expect(await mailbox(viewer, p.id, 'OFFER_SUBMITTED')).toHaveLength(1);
+    expect((await mailbox(viewer, p.id)).every((message) => message.audience === 'MEMBERS')).toBe(
+      true,
+    );
+    await viewer.error('POST', '/mailbox/' + captured[0].id + '/read', {}, 404);
+    const second = await commit(runtime.buyers[1], p.id);
+    await capture(runtime.buyers[1], second.id);
+    await capture(runtime.buyers[1], second.id);
+    for (const client of [runtime.buyers[0], runtime.buyers[1], runtime.supplier]) {
+      expect(await mailbox(client, p.id, 'SUCCESS_REACHED')).toHaveLength(1);
+    }
+    expect(await mailbox(viewer, p.id, 'SUCCESS_REACHED')).toHaveLength(1);
+    expect(await mailbox(runtime.buyers[2], p.id)).toHaveLength(0);
+  });
+
+  it('keeps more than 200 historical letters readable with an exact unread count', async () => {
+    const owner = runtime.buyers[1];
+    const p = await procurement(owner);
+    await owner.post('/procurements/' + p.id + '/publish');
+    const eventPrefix = unique('mailbox-history');
+    const history = await runtime.pool.query<{ id: string; event_key: string }>(
+      `INSERT INTO mailbox_messages(organization_id,organization_name,procurement_id,procurement_title,kind,audience,subject,body,event_key,created_at)
+       SELECT $1::uuid,$2,$3::uuid,$4,'OFFER_SUBMITTED','MEMBERS',
+        'Varasem pakkumise teavitus ' || n::text,
+        'Teenusepakkuja uuendas selle hanke pakkumist.',
+        $5 || ':' || n::text,clock_timestamp()-(206-n)*INTERVAL '1 second'
+       FROM generate_series(1,205) AS entries(n)
+       RETURNING id,event_key`,
+      [owner.organization.id, owner.organization.name, p.id, p.title, eventPrefix],
+    );
+    const oldestId = history.rows.find((row) => row.event_key === eventPrefix + ':1')!.id;
+    const before = await owner.get<MailboxResponse>('/mailbox');
+    const visibleHistory = before.messages.filter((message) => message.procurementId === p.id);
+    expect(visibleHistory).toHaveLength(205);
+    expect(visibleHistory.at(-1)?.id).toBe(oldestId);
+    expect(visibleHistory.every((message) => message.readAt === null)).toBe(true);
+    expect(before.unreadCount).toBe(before.messages.filter((message) => !message.readAt).length);
+    expect(await mailbox(runtime.buyers[0], p.id)).toHaveLength(0);
+    await runtime.buyers[0].error('POST', '/mailbox/' + oldestId + '/read', {}, 404);
+    const read = await owner.post<{ message: MailboxResponse['messages'][number] }>(
+      '/mailbox/' + oldestId + '/read',
+    );
+    expect(read.message.readAt).not.toBeNull();
+    const after = await owner.get<MailboxResponse>('/mailbox');
+    expect(after.messages.filter((message) => message.procurementId === p.id)).toHaveLength(205);
+    expect(after.unreadCount).toBe(before.unreadCount - 1);
+    expect(after.messages.find((message) => message.id === oldestId)?.readAt).toBe(
+      read.message.readAt,
+    );
+  });
+});
+
 describe('transactional commitments and test payments', () => {
   it('prevents duplicate organization acceptances under concurrency', async () => {
     const { procurement: p } = await selectedProcurement(runtime);
@@ -466,7 +708,7 @@ describe('transactional commitments and test payments', () => {
 
 describe('deadline processing, historical records and administration', () => {
   it('recovers due finalization after a worker restart, creates buyer contracts, rounds fees and reverses cancellation payouts', async () => {
-    const deadline = future(3_000);
+    const deadline = future(5_000);
     const { procurement: p } = await selectedProcurement(runtime, { deadline });
     const accepted = await Promise.all(
       runtime.buyers.slice(0, 4).map((client) => commit(client, p.id)),
@@ -492,6 +734,11 @@ describe('deadline processing, historical records and administration', () => {
     const after = await detail(runtime.admin, p.id);
     expect(after.procurement.status).toBe('FINALIZED');
     expect(after.contracts).toHaveLength(3);
+    for (const client of [...runtime.buyers.slice(0, 3), runtime.supplier]) {
+      const messages = await mailbox(client, p.id, 'PROCUREMENT_FINALIZED');
+      expect(messages).toHaveLength(1);
+      expect(messages[0].subject + ' ' + messages[0].body).toMatch(/TEST/);
+    }
     const buyerDetail = await detail(runtime.buyers[0], p.id);
     expect(buyerDetail.contracts).toHaveLength(1);
     expect(buyerDetail.commitments).toHaveLength(1);
@@ -573,6 +820,11 @@ describe('deadline processing, historical records and administration', () => {
     expect(cancelled.commitments.find((c) => c.id === accepted[0].id)?.acceptanceSnapshot).toEqual(
       acceptance,
     );
+    for (const client of [...runtime.buyers.slice(0, 4), runtime.supplier]) {
+      const messages = await mailbox(client, p.id, 'SUPPLIER_CANCELLATION');
+      expect(messages).toHaveLength(1);
+      expect(messages[0].subject + ' ' + messages[0].body).toMatch(/TEST/);
+    }
   });
 
   it('fails below-threshold groups and refunds late captures without duplicates', async () => {
@@ -583,6 +835,7 @@ describe('deadline processing, historical records and administration', () => {
     await capture(runtime.buyers[0], first.id);
     await waitUntil(deadline);
     await capture(runtime.buyers[1], late.id);
+    await capture(runtime.buyers[1], late.id);
     await finalize();
     await finalize();
     const after = await detail(runtime.buyers[0], p.id);
@@ -592,6 +845,11 @@ describe('deadline processing, historical records and administration', () => {
     expect((await ledger(p.id)).DEPOSIT).toEqual({ count: 2, total: 20_006 });
     expect((await ledger(p.id)).REFUND).toEqual({ count: 2, total: 20_006 });
     expect((await ledger(p.id)).SUPPLIER_PAYOUT).toBeUndefined();
+    expect(await mailbox(runtime.buyers[0], p.id, 'PROCUREMENT_FAILED')).toHaveLength(1);
+    expect(await mailbox(runtime.buyers[1], p.id, 'PROCUREMENT_FAILED')).toHaveLength(1);
+    const lateMessages = await mailbox(runtime.buyers[1], p.id, 'LATE_PAYMENT_REFUNDED');
+    expect(lateMessages).toHaveLength(1);
+    expect(lateMessages[0].subject + ' ' + lateMessages[0].body).toMatch(/TEST/);
     await runtime.buyers[2].error(
       'POST',
       '/procurements/' + p.id + '/commitments',
@@ -632,6 +890,7 @@ describe('deadline processing, historical records and administration', () => {
       expect(failed.rows[0].last_error).toContain('Injected contract storage failure');
       expect((await detail(runtime.admin, p.id)).contracts).toHaveLength(0);
       expect((await ledger(p.id)).SUPPLIER_PAYOUT).toBeUndefined();
+      expect(await mailbox(runtime.buyers[0], p.id, 'PROCUREMENT_FINALIZED')).toHaveLength(0);
     } finally {
       await runtime.pool.query('DROP TRIGGER test_contract_storage_failure ON contracts');
       await runtime.pool.query('DROP FUNCTION test_fail_contract()');
@@ -648,6 +907,7 @@ describe('deadline processing, historical records and administration', () => {
     expect((await detail(runtime.buyers[0], p.id)).procurement.status).toBe('FINALIZED');
     expect((await ledger(p.id)).PLATFORM_FEE.total).toBe(1);
     expect((await ledger(p.id)).SUPPLIER_PAYOUT.total).toBe(12);
+    expect(await mailbox(runtime.buyers[0], p.id, 'PROCUREMENT_FINALIZED')).toHaveLength(1);
     const done = await runtime.pool.query<{ status: string; attempts: number }>(
       'SELECT status,attempts FROM jobs WHERE procurement_id=$1',
       [p.id],

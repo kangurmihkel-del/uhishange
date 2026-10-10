@@ -162,6 +162,35 @@ export interface Invitation {
   status: 'PENDING' | 'ACCEPTED' | 'DECLINED';
   createdAt: string;
 }
+export type MailboxMessageKind =
+  | 'INVITATION'
+  | 'OFFER_SUBMITTED'
+  | 'OFFER_SELECTED'
+  | 'SUCCESS_REACHED'
+  | 'PROCUREMENT_FINALIZED'
+  | 'PROCUREMENT_FAILED'
+  | 'SUPPLIER_CANCELLATION'
+  | 'TEST_PAYMENT_FAILED'
+  | 'TEST_PAYMENT_CAPTURED'
+  | 'LATE_PAYMENT_REFUNDED';
+export interface MailboxMessage {
+  id: string;
+  organizationId: string;
+  organizationName: string;
+  procurementId: string;
+  procurementTitle: string;
+  kind: MailboxMessageKind;
+  subject: string;
+  body: string;
+  audience: 'MEMBERS' | 'REPRESENTATIVES';
+  createdAt: string;
+  readAt: string | null;
+  invitation: Invitation | null;
+}
+export interface MailboxResponse {
+  messages: MailboxMessage[];
+  unreadCount: number;
+}
 export interface NearbyOrganization extends Organization {
   distanceM: number;
 }

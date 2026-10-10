@@ -9,6 +9,7 @@ import type {
   FinalContractSnapshot,
 } from '../shared/types.js';
 import { pool, transaction } from './db.js';
+import { messagesFromAudit } from './mailbox.js';
 import { assert, DomainError } from './errors.js';
 import { organizationView } from './views.js';
 import { PLATFORM_FEE_BASIS_POINTS } from '../shared/constants.js';
@@ -59,10 +60,11 @@ export async function audit(
   action: string,
   details: Record<string, unknown> = {},
 ): Promise<void> {
-  await client.query(
-    'INSERT INTO audit(actor_user_id,procurement_id,action,details) VALUES($1,$2,$3,$4)',
+  const result = await client.query<{ id: string }>(
+    'INSERT INTO audit(actor_user_id,procurement_id,action,details) VALUES($1,$2,$3,$4) RETURNING id',
     [userId, procurementId, action, JSON.stringify(details)],
   );
+  await messagesFromAudit(client, result.rows[0].id, procurementId, action, details);
 }
 export async function authority(
   client: PoolClient,

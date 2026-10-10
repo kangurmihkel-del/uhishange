@@ -14,6 +14,7 @@ import {
   verifyPassword,
 } from './auth.js';
 import { pool, transaction } from './db.js';
+import { getMailbox, markMailboxRead } from './mailbox.js';
 import { assert, DomainError } from './errors.js';
 import {
   audit,
@@ -362,6 +363,12 @@ export function createApp(): express.Express {
         ])
       ).rows.map(invitationView),
     });
+  });
+  app.get('/api/v1/mailbox', async (req: AuthRequest, res) => {
+    res.json(await getMailbox(requireUser(req)));
+  });
+  app.post('/api/v1/mailbox/:id/read', async (req: AuthRequest, res) => {
+    res.json({ message: await markMailboxRead(requireUser(req), param(req)) });
   });
   app.get('/api/v1/invitations', async (req: AuthRequest, res) => {
     const user = requireUser(req);

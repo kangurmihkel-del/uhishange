@@ -41,6 +41,14 @@ Approved viewers can read their organization invitations and open the procuremen
 
 CSV preview errors identify the affected row and field in Estonian, with a useful correction for registry code, name, organization type, address, coordinates or email. Whole-file validation and atomic import behavior remain unchanged.
 
+## Mailbox and visible next actions
+
+The in-app demo mailbox shows durable procurement invitations and lifecycle messages in Estonian. No external email is sent. Each approved organization representative sees messages for their organizations; approved viewers may read invitations and general messages but cannot respond on behalf of an organization or see restricted financial messages. Administrators may inspect all messages. Reading is recorded per user, survives logout/restart, and does not grant organization authority. Repeated invitation sends and replayed financial operations must not create duplicate messages. Existing seeded invitations appear in the mailbox without resetting pilot data.
+
+Messages link to the relevant procurement or contract. Invitation messages retain the existing accept/decline operations and explicitly say that accepting is separate from joining/paying. Supplier publication notifies the initiator, offer selection notifies the supplier and invited buyers, success and finalization notify involved organizations, and failure/cancellation explain test refunds. Financial messages remain labeled TEST.
+
+The procurement page presents the process and next action above secondary details: publish a draft, find/invite neighbors, receive/choose an offer, confirm participation and test payment, wait for the joining deadline, then review the contract and complete/rate the service. The next action depends on lifecycle and approved organization role. Buttons open/scroll to the actual form or map; important forms do not require guessing a hidden tab. Terminal or expired states show their status and appropriate available history. The neighbor demo account buyer2@demo.test is a visible demo-login choice with password Demo2026!.
+
 ## Definition of Done
 
 All rules have API/integration coverage; buyer/supplier/admin flows have browser coverage; build and static analysis pass; operations and API docs match behavior.

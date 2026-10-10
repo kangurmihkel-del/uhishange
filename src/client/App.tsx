@@ -29,6 +29,7 @@ import {
   FileText,
   Home,
   Layers3,
+  Mail,
   LogOut,
   MapPin,
   Menu,
@@ -46,6 +47,7 @@ import type {
   Contract,
   ImportPreview,
   Invitation,
+  MailboxResponse,
   NearbyOrganization,
   Offer,
   Organization,
@@ -55,6 +57,8 @@ import type {
 } from '../shared/types';
 import { api, date, euro, localDateTime, utcDateTime } from './api';
 import AgreementHistory from './AgreementHistory';
+import Mailbox from './Mailbox';
+import ProcurementFlow, { type FlowTarget } from './ProcurementFlow';
 
 type Notice = { kind: 'success' | 'error'; text: string } | null;
 type Operations = {
@@ -263,6 +267,30 @@ export default function App() {
     () => localStorage.getItem('uhishange-organization') || '',
   );
   const [mobileMenu, setMobileMenu] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  useEffect(() => {
+    let alive = true;
+    if (!session?.user) {
+      setUnreadCount(0);
+      return;
+    }
+    const load = () =>
+      api<MailboxResponse>('/mailbox')
+        .then((value) => {
+          if (alive) setUnreadCount(value.unreadCount);
+        })
+        .catch(() => {
+          /* The mailbox page displays load errors. */
+        });
+    void load();
+    const timer = window.setInterval(() => {
+      void load();
+    }, 5000);
+    return () => {
+      alive = false;
+      window.clearInterval(timer);
+    };
+  }, [session?.user?.id, revision]);
   const refreshSession = useCallback(async () => {
     const value = await api<SessionResponse>('/session');
     setSession(value);
@@ -327,6 +355,7 @@ export default function App() {
   const nav = [
     { id: 'overview', label: 'Ülevaade', icon: Home },
     { id: 'procurements', label: 'Hanked', icon: Layers3 },
+    { id: 'mailbox', label: 'Postkast', icon: Mail },
     { id: 'invitations', label: 'Kutsed', icon: Bell },
     { id: 'contracts', label: 'Lepingud', icon: FileCheck2 },
     { id: 'organization', label: 'Minu organisatsioon', icon: Building2 },
@@ -398,7 +427,15 @@ export default function App() {
                 >
                   <Icon size={20} />
                   <span>{label}</span>
-                  {id === 'invitations' && <span className="nav-pip" />}
+                  {id === 'mailbox' && unreadCount > 0 && (
+                    <span
+                      className="nav-unread"
+                      aria-hidden="true"
+                      title={unreadCount + ' lugemata kirja'}
+                    >
+                      {unreadCount}
+                    </span>
+                  )}
                 </a>
               ))}
             </nav>
@@ -442,8 +479,15 @@ export default function App() {
                 <span className="location-tag">
                   <MapPin size={15} /> Mustamäe, Tallinn
                 </span>
-                <a href="#invitations" className="icon-button" aria-label="Vaata kutseid">
-                  <Bell size={19} />
+                <a
+                  href="#mailbox"
+                  className="icon-button"
+                  aria-label={
+                    'Vaata postkasti' + (unreadCount ? ', ' + unreadCount + ' lugemata kirja' : '')
+                  }
+                >
+                  <Mail size={19} />
+                  {unreadCount > 0 && <span className="topbar-mail-dot" />}
                 </a>
                 <span className="topbar-divider" />
                 <div className="user-avatar" aria-hidden="true">
@@ -542,6 +586,9 @@ export default function App() {
                   representative={representative}
                   revision={revision}
                 />
+              )}
+              {route === 'mailbox' && (
+                <Mailbox revision={revision} session={session} busy={busy} run={run} />
               )}
               {route === 'invitations' && <Invitations revision={revision} session={session} />}
               {route === 'contracts' && (
@@ -718,6 +765,10 @@ function Auth({ onLogin }: { onLogin: () => Promise<void> }) {
                 <Building2 size={16} />
                 Ostja
               </Button>
+              <Button variant="secondary" onClick={() => demo('buyer2@demo.test')}>
+                <Building2 size={16} />
+                Naaberühistu
+              </Button>
               <Button variant="secondary" onClick={() => demo('supplier@demo.test')}>
                 <Snowflake size={16} />
                 Pakkuja
@@ -728,7 +779,8 @@ function Auth({ onLogin }: { onLogin: () => Promise<void> }) {
               </Button>
             </div>
             <small>
-              Demoparool: <code>Demo2026!</code> · Võid kasutada ka buyer2…buyer8@demo.test.
+              Demoparool: <code>Demo2026!</code> · Naaberühistu: buyer2@demo.test. Alusta ostjana,
+              saada kutse ja ava see naaberühistu postkastis.
             </small>
           </div>
           <div className="auth-test">
@@ -1330,7 +1382,27 @@ function ProcurementPage({
   const [detail, setDetail] = useState<ProcurementDetail>();
   const [error, setError] = useState('');
   const [tab, setTab] = useState('overview');
-  const { run } = useOperations();
+  const [offerOpenRequest, setOfferOpenRequest] = useState(0);
+  const { run, busy } = useOperations();
+  const navigate = (target: FlowTarget) => {
+    if (target === 'contracts') {
+      window.location.hash = 'contracts';
+      return;
+    }
+    if (target !== 'join') setTab(target === 'offer-form' ? 'offers' : target);
+    if (target === 'offer-form') setOfferOpenRequest((value) => value + 1);
+    window.setTimeout(() => {
+      const region = document.getElementById(
+        target === 'join'
+          ? 'procurement-join'
+          : target === 'offer-form'
+            ? 'procurement-offer-form'
+            : 'procurement-work',
+      );
+      region?.focus({ preventScroll: true });
+      region?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }, 60);
+  };
   useEffect(() => {
     let alive = true;
     const load = async () => {
@@ -1394,19 +1466,6 @@ function ProcurementPage({
             Liitumine {date(procurement.joinDeadlineAt, true)}-ni
           </p>
         </div>
-        {own && procurement.status === 'DRAFT' && (
-          <Button
-            onClick={() =>
-              run(
-                () => api(`/procurements/${id}/publish`, {}),
-                'Hange on avaldatud. Teenusepakkujad saavad esitada pakkumisi.',
-              )
-            }
-          >
-            <CheckCircle2 size={18} />
-            Avalda hange
-          </Button>
-        )}
       </div>
       {error && (
         <div role="alert" className="inline-error">
@@ -1441,6 +1500,19 @@ function ProcurementPage({
           </span>
         </div>
       )}
+      <ProcurementFlow
+        detail={detail}
+        organization={organization}
+        representative={representative}
+        busy={busy}
+        onNavigate={navigate}
+        onPublish={() => {
+          void run(
+            () => api('/procurements/' + id + '/publish', {}),
+            'Hange on avaldatud. Kutsu nüüd naabrid kaasa.',
+          );
+        }}
+      />
       <div className="detail-tabs" role="group" aria-label="Hanke vaade">
         {[
           ['overview', 'Ülevaade'],
@@ -1459,7 +1531,7 @@ function ProcurementPage({
         ))}
       </div>
       <div className="detail-layout">
-        <div className="detail-main">
+        <div className="detail-main" id="procurement-work" tabIndex={-1}>
           {tab === 'overview' && (
             <>
               <section className="card detail-description">
@@ -1565,14 +1637,18 @@ function ProcurementPage({
                 representative &&
                 open &&
                 !procurement.frozenAt && (
-                  <OfferForm procurement={procurement} organization={organization} />
+                  <OfferForm
+                    procurement={procurement}
+                    organization={organization}
+                    openRequest={offerOpenRequest}
+                  />
                 )}
             </>
           )}
           {tab === 'neighbors' && (
             <section className="card">
               <SectionHeading eyebrow="KOOSTÖÖ SINU LÄHEDAL" title="Naabrid ja kutsed">
-                {own && ['OPEN', 'SUCCEEDED'].includes(procurement.status) && (
+                {own && open && (
                   <Button
                     variant="secondary"
                     onClick={() =>
@@ -1701,18 +1777,20 @@ function ProcurementPage({
             )}
           </section>
           {selected && organization?.orgType === 'BUYER' && representative && (
-            <JoinPanel
-              procurement={procurement}
-              organization={organization}
-              selected={selected}
-              commitment={commitment}
-              allCommitments={commitments}
-              open={open}
-              eligible={
-                organization.id === procurement.organizationId ||
-                nearby.some((item) => item.id === organization.id)
-              }
-            />
+            <div id="procurement-join" tabIndex={-1}>
+              <JoinPanel
+                procurement={procurement}
+                organization={organization}
+                selected={selected}
+                commitment={commitment}
+                allCommitments={commitments}
+                open={open}
+                eligible={
+                  organization.id === procurement.organizationId ||
+                  nearby.some((item) => item.id === organization.id)
+                }
+              />
+            </div>
           )}
           <TestNotice />
           <section className="card refund-guide">
@@ -1833,11 +1911,16 @@ function OfferCard({
 function OfferForm({
   procurement,
   organization,
+  openRequest = 0,
 }: {
   procurement: Procurement;
   organization: Organization;
+  openRequest?: number;
 }) {
   const [expanded, setExpanded] = useState(false);
+  useEffect(() => {
+    if (openRequest) setExpanded(true);
+  }, [openRequest]);
   const [tiers, setTiers] = useState<Array<{ participants: string; price: string }>>([
     { participants: '3', price: '' },
     { participants: '5', price: '' },
@@ -1864,7 +1947,7 @@ function OfferForm({
     );
   };
   return (
-    <section className="card form-card">
+    <section className="card form-card" id="procurement-offer-form" tabIndex={-1}>
       <SectionHeading title="Sinu pakkumine">
         {!expanded && (
           <Button onClick={() => setExpanded(true)}>

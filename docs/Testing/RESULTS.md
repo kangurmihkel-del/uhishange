@@ -6,15 +6,15 @@ The functional local pilot is running at http://localhost:3000. All required loc
 
 ## Recorded commands
 
-| Command                          | Result                                                                                    |
-| -------------------------------- | ----------------------------------------------------------------------------------------- |
-| npm run build                    | Passed: server TypeScript compilation and production Vite assets                          |
-| npm test                         | Passed: 20 integration/time tests and 10 browser workflows                                |
-| npm run analyze                  | Passed: strict TypeScript, ESLint and Prettier checks                                     |
-| npm audit --audit-level=moderate | Passed: zero reported vulnerabilities                                                     |
-| docker compose config --quiet    | Passed                                                                                    |
-| docker compose up --build -d     | Passed: production images built and services initialized                                  |
-| node scripts/verify-preview.mjs  | Passed: eight production screenshots, zero browser errors and no horizontal page overflow |
+| Command                          | Result                                                                                     |
+| -------------------------------- | ------------------------------------------------------------------------------------------ |
+| npm run build                    | Passed: server TypeScript compilation and production Vite assets                           |
+| npm test                         | Passed: 23 integration/API/time tests and 10 browser workflows                             |
+| npm run analyze                  | Passed: strict TypeScript, ESLint and Prettier checks                                      |
+| npm audit --audit-level=moderate | Passed: zero reported vulnerabilities                                                      |
+| docker compose config --quiet    | Passed                                                                                     |
+| docker compose up --build -d     | Passed: production images built and services initialized                                   |
+| node scripts/verify-preview.mjs  | Passed: eleven production screenshots, zero browser errors and no horizontal page overflow |
 
 Environment: Node 24.19.0, PostgreSQL 17.5, PostGIS 3.5.2, Vitest 5.0.3 and Playwright Chromium. The browser suite uses the compiled production application on a separate port and database.
 
@@ -26,13 +26,13 @@ Final Vitest V8 coverage from the passing suite:
 
 | Scope                                              | Statements | Branches | Functions | Lines  |
 | -------------------------------------------------- | ---------- | -------- | --------- | ------ |
-| Configured server and client API/time helper files | 92.77%     | 70.11%   | 95.45%    | 94.39% |
-| Reported server modules                            | 93.83%     | 77.25%   | 98.33%    | 95.29% |
-| Transactional procurement domain                   | 96.00%     | 87.20%   | 100.00%   | 99.37% |
+| Configured server and client API/time helper files | 93.45%     | 74.42%   | 95.77%    | 95.04% |
+| Reported server modules                            | 94.44%     | 80.86%   | 98.46%    | 95.89% |
+| Transactional procurement domain                   | 96.02%     | 87.20%   | 100.00%   | 99.37% |
 
 The configured coverage excludes the HTTP/worker entry files; an actual worker subprocess is exercised by the restart scenario. React views are verified by Playwright and are not included in these V8 percentages. Generated reports are in `coverage/` and `playwright-report/`. Coverage is evidence of execution, not a claim that every branch is tested.
 
-All 29 declared HTTP API routes are exercised. The endpoint matrix and scenario details are in [tests/README.md](../../tests/README.md).
+All 31 declared HTTP API routes are exercised. The endpoint matrix and scenario details are in [tests/README.md](../../tests/README.md).
 
 ## Verified behavior
 
@@ -70,10 +70,20 @@ The public commit excludes the original named-participant event poster and gener
 
 ## Runtime and handoff
 
-The final Compose state is: database healthy, application healthy, worker running and initializer exited successfully with code 0. The public health endpoint returned `status: ok`, `database: ready` and `paymentMode: TEST`. Database contents persisted across image rebuilds; the main database retained its single seeded procurement with no captured financial transactions. Integration and browser fixtures remain in their isolated test databases.
+The final Compose state is: database healthy, application healthy, worker running and initializer exited successfully with code 0. The public health endpoint returned `status: ok`, `database: ready` and `paymentMode: TEST`. Database contents persisted across image rebuilds; the mailbox upgrade preserved the existing procurement and financial history. Smoke checks create only login sessions and read receipts; they do not make test payments in the main database. Integration and browser fixtures remain in their isolated test databases.
 
 SHA-256 checks confirmed all four original input files are unchanged. The copied MCAF guide matches its source byte for byte. [Source inventory](../Sources.md) records their hashes.
 
 [README](../../README.md) provides startup instructions, demo credentials, the CSV template and reset instructions. [Operations](../Operations/README.md) documents configuration, worker recovery and backup/restore commands.
 
 All financial transactions are simulated; remaining service balances are invoiced outside the pilot. External email, live payments, registry integration and hosting are intentionally deferred. The GitHub Actions workflow runs the same gates after publication; the local results above do not establish a hosted CI result. Backup/restore instructions are supplied but were not executed against the main pilot database.
+
+## Mailbox and guided procurement acceptance
+
+The updated real-database suite passes 23 integration/API/time cases, and all five browser scenarios pass on desktop and mobile (10 cases). Mailbox assertions verify organization isolation, representative-only financial letters, pending/viewer restrictions, independent per-user read state, concurrent idempotent reads, immutable letters/receipts, seeded-invitation backfill, replay deduplication and transaction rollback before job retry. A 205-letter fixture proves older unread messages remain accessible. Mailbox module coverage: 96.87% statements, 93.18% branches, 100% functions and lines.
+
+The complete buyer scenario uses visible next actions for publication, the neighbor map/invitations, supplier offers, offer comparison/selection, joining and TEST payment. The named neighbor demo account opens its invitation in Postkast and accepts it separately from participation. Contract and viewer scenarios verify durable read status, contract navigation and authorization. Production smoke checks cover the same mailbox/process layouts with zero browser errors or horizontal overflow. The four original source hashes still match.
+
+- [Desktop mailbox](screenshots/mailbox-desktop.png)
+- [Desktop opened letter](screenshots/mailbox-letter-desktop.png)
+- [Mobile opened letter](screenshots/mailbox-letter-mobile.png)
