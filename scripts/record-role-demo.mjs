@@ -8,13 +8,35 @@ import { resolve } from 'node:path';
 import pg from 'pg';
 import { chromium, expect } from '@playwright/test';
 
-// A focused, real-UI recording: buyer request -> supplier offer -> buyer selection.
-// It deliberately excludes administrator work and runs against a separate database.
+// Real-UI recordings: a calm detailed version and a concise three-step version.
+// Both exclude administrator work and run against separate databases.
 const runId = Date.now().toString();
 const databaseName = `uhishange_role_demo_${runId}`;
 assert.match(databaseName, /^uhishange_role_demo_\d+$/);
 const output = resolve('recordings', runId);
-const targetSeconds = 60;
+const mode = process.env.DEMO_MODE || 'slow';
+assert.ok(['slow', 'concise'].includes(mode), 'DEMO_MODE must be slow or concise');
+const concise = mode === 'concise';
+const targetSeconds = concise ? 60 : 110;
+const timings = concise
+  ? {
+      request: 5500,
+      neighbors: 4000,
+      offer: 6500,
+      sendFocus: 13000,
+      comparison: 5500,
+      selected: 6500,
+    }
+  : {
+      request: 12000,
+      neighbors: 10000,
+      offer: 15000,
+      sendFocus: 25000,
+      comparison: 15000,
+      selected: 12000,
+    };
+const versionLabel = concise ? '60-second concise role demo' : '110-second detailed role demo';
+const videoStem = concise ? 'uhishange-role-demo-concise-60s' : 'uhishange-role-demo-detailed-110s';
 const mainURL = new URL(
   process.env.DATABASE_URL || 'postgres://uhishange:uhishange@localhost:54329/uhishange',
 );
@@ -297,7 +319,7 @@ try {
     ['Reageerimisaeg (h)', '6'],
   ])
     await fill(serviceField(name), value);
-  await snapshot('client-prefilled-request', 3500);
+  await snapshot('client-prefilled-request', timings.request);
   await click(button('Salvesta hange'));
   await expect(page.getByRole('heading', { name: title, exact: true })).toBeVisible();
   procurementId = page.url().split('#procurement/')[1];
@@ -307,10 +329,14 @@ try {
   await stage(
     'KLIENT · ÜHISTU',
     '♔',
-    'Naabrid kaardil',
-    'Klient näeb lähimaid ühistuid ja saadab neile kutse.',
+    concise ? 'Klient valib ühistud' : 'Naabrid kaardil',
+    concise
+      ? 'Klient valib kaardilt naaberühistu enne pakkumise osa.'
+      : 'Klient näeb lähimaid ühistuid ja saadab neile kutse.',
   );
-  await snapshot('client-neighbors', 2200);
+  const map = page.getByRole('img', { name: /Hanke keskpunkt ja läheduses olevad ühistud/ });
+  await click(map.getByRole('button').first());
+  await snapshot('client-neighbors', timings.neighbors);
   await click(button('Saada kutsed'));
   await logout();
 
@@ -338,7 +364,7 @@ try {
     ],
   ])
     await fill(locator, value);
-  await snapshot('supplier-prefilled-offer', 5000);
+  await snapshot('supplier-prefilled-offer', timings.offer);
   const sendOffer = button('Saada pakkumine');
   await stage(
     'HANKIJA · TEENUSEPAKKUJA',
@@ -346,7 +372,7 @@ try {
     'Pakkumine on saatmiseks valmis',
     'Fookus: kontrolli hinnatasemeid, tingimusi ja 10% tagatisepõhist teenustasu.',
   );
-  await spotlight(sendOffer, 12000);
+  await spotlight(sendOffer, timings.sendFocus);
   await click(sendOffer);
   await expect(
     page.getByRole('status').filter({ hasText: 'Pakkumine on esitatud.' }),
@@ -364,10 +390,10 @@ try {
   await fill(label('Otsi hankeid'), title);
   await click(page.getByRole('link', { name: new RegExp(escape(title)) }).first());
   await nextAction('Võrdle ja vali pakkumine');
-  await snapshot('client-offer-comparison', 4500);
+  await snapshot('client-offer-comparison', timings.comparison);
   await click(button('Vali pakkumine'));
   await expect(page.getByText('Valitud pakkumine', { exact: true })).toBeVisible();
-  await snapshot('client-selected-offer', 3500);
+  await snapshot('client-selected-offer', timings.selected);
   await stage(
     'KLIENT · ÜHISTU',
     '♔',
@@ -389,9 +415,9 @@ try {
   const video = page.video();
   await context.close();
   context = undefined;
-  const raw = resolve(output, 'uhishange-role-offer-demo-raw.webm');
+  const raw = resolve(output, `${videoStem}-raw.webm`);
   await rename(await video.path(), raw);
-  const outputVideo = resolve(output, 'uhishange-role-offer-demo-60s.mp4');
+  const outputVideo = resolve(output, `${videoStem}.mp4`);
   await run('ffmpeg', [
     '-y',
     '-i',
@@ -425,7 +451,10 @@ try {
   assert.equal(media.streams[0].codec_name, 'h264');
   assert.equal(media.streams[0].width, 1440);
   assert.equal(media.streams[0].height, 900);
-  assert.ok(Number(media.format.duration) >= 59.5 && Number(media.format.duration) <= 60.5);
+  assert.ok(
+    Number(media.format.duration) >= targetSeconds - 0.5 &&
+      Number(media.format.duration) <= targetSeconds + 0.5,
+  );
   await run('ffmpeg', ['-v', 'error', '-xerror', '-i', outputVideo, '-f', 'null', '-']);
   await writeFile(
     resolve(output, 'verification.json'),
@@ -437,7 +466,8 @@ try {
         excludesAdministrator: true,
         roles: { client: '♔', supplier: '♞' },
         supplierOfferFieldsPrefilled: true,
-        offerSubmissionSpotlightSeconds: 12,
+        mode,
+        offerSubmissionSpotlightSeconds: timings.sendFocus / 1000,
         browserErrors: errors,
         procurement: procurementRows[0],
         media: {
@@ -455,7 +485,7 @@ try {
   );
   await writeFile(
     resolve(output, 'README.md'),
-    '# Ühishange 60-second role demo\n\nThis real-UI recording excludes administrator work. It shows a client (♔) creating and sharing a prefilled request, then a supplier (♞) submitting a prefilled offer. The submission button is deliberately highlighted for 12 seconds. All activity is fictional and uses the TEST environment.\n',
+    `# Ühishange ${versionLabel}\n\nThis real-UI recording excludes administrator work. It shows a client (♔) creating a prefilled request, then a supplier (♞) submitting a prefilled offer. The submission button is deliberately highlighted for ${timings.sendFocus / 1000} seconds. ${concise ? 'The concise version skips the neighbor-map sequence.' : 'The detailed version also shows the neighbor-map invitation sequence.'} All activity is fictional and uses the TEST environment.\n`,
   );
   console.log(`DEMO COMPLETE: ${outputVideo}`);
 } catch (error) {
